@@ -5,7 +5,7 @@
         <title>CS 4731 Final Project Part I</title>
         <script id="vshader" type="x-shader/x-vertex">
             attribute vec4 vPosition;
-            attribute vec4 vNormal;
+            attribute vec3 vNormal;
             
             uniform mat4 modelMatrix;
             uniform mat4 projMatrix;
@@ -43,12 +43,12 @@
             
             void main() {
             // diffuse
-            vec4 diffuse = lightDiffuse * materialDiffuse * dot(L, N);
+            vec4 diffuse = lightDiffuse * vDiffuse * dot(L, N);
             // specular
             vec3 R = 2.0 * (dot(L, N) * N) - L;
-            vec4 specular = lightSpecular * materialSpecular * pow(max(dot(V, R), 0.0), shininess);
+            vec4 specular = lightSpecular * vSpecular * pow(max(dot(V, R), 0.0), shininess);
             // ambient
-            vec4 ambient = lightAmbient * materialAmbient;
+            vec4 ambient = lightAmbient * vAmbient;
 
             vec4 fColor = diffuse + specular + ambient;
 	        fColor.a = 1.0;
