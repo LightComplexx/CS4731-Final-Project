@@ -132,7 +132,7 @@ function render() {
     let pad_b_offset = mult(
         translate(0.0, 0.0, -2.0),
         mult(
-            translate(0.0, 3.3, 2.0),
+            translate(0.0, 3.25, 2.0),
             rotateX(90.0)
         )
     );
@@ -141,7 +141,7 @@ function render() {
     let pad_r_offset = mult(
         translate(0.0, 0.0, -2.0),
         mult(
-            translate(0.0, 2.5, 2.0),
+            translate(0.0, 2.6, 2.0),
             mult(
                 rotateX(-90.0),
                 translate(0.0, 0.0, 0.0)
