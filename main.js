@@ -11,7 +11,15 @@ let vNormal;    // Normals position attribute
 let cameraPos = 0.0;
 
 let ballZ = 0.0;
-let ballDir = 0.01;
+let ballSpeed = 0.01;
+
+let bPadZ = 2.0;
+let bPadSpeed = 0.005;
+let move_bPad = false;
+
+let rPadZ = 2.0;
+let rPadSpeed = 0.005;
+let move_rPad = false;
 
 // Model variables
 // + Vertex position buffers for each
@@ -110,16 +118,15 @@ function waitForModels() {
 }
 
 function render() {
-    // Ball movement
-    if(ballZ > 1.5 && ballDir > 0 || ballZ < -2 && ballDir < 0){
-        ballDir *= -1.0;
-    }
-    ballZ+= ballDir;
-    cameraPos+=0.01;
+    // Check for paddle trigger
+    padTrigger();
+
+    // Calculate object movements
+    calcObjectMovements();
 
     // Create view matrix
     let viewMatrix = lookAt(
-        vec3(6.0, 4.0, 0.0),    // camera position
+        vec3(6.0, 4.0, cameraPos),    // camera position
         vec3(0.0, 0.0, 0.0),    // look at center
         vec3(0.0, 1.0, 0.0)     // up
     );
@@ -132,7 +139,7 @@ function render() {
     let pad_b_offset = mult(
         translate(0.0, 0.0, -2.0),
         mult(
-            translate(0.0, 3.25, 2.0),
+            translate(0.0, 3.25, bPadZ),
             rotateX(90.0)
         )
     );
@@ -141,7 +148,7 @@ function render() {
     let pad_r_offset = mult(
         translate(0.0, 0.0, -2.0),
         mult(
-            translate(0.0, 2.6, 2.0),
+            translate(0.0, 2.6, rPadZ),
             mult(
                 rotateX(-90.0),
                 translate(0.0, 0.0, 0.0)
@@ -278,4 +285,68 @@ function drawModel(model, bufferGroups, matrix) {
         // Render object to screen
         gl.drawArrays(gl.TRIANGLES, 0, group.vertexCount);
     }
+}
+
+/**
+ * Triggers paddle movement based on the
+ * position of the ball.
+ */
+function padTrigger(){
+    // Check ball bounds for red paddle movement to
+    // trigger animation.
+    // Reset pad direction when animation finishes
+    if (ballZ < -1.5 && !move_rPad){
+        move_rPad = true;
+    } else if (ballZ > -1.5){
+        rPadSpeed *= -1.0;
+    }
+
+    // Check ball bounds for blue paddle movement to
+    // trigger animation.
+    // Reset pad direction when animation finishes
+    if (ballZ > 1.0 && !move_bPad) {
+        move_bPad = true;
+    } else if(ballZ < 1.0) {
+        bPadSpeed *= -1.0;
+    }
+}
+
+/**
+ * Calculates movement for all objects
+ * that move within the scene.
+ */
+function calcObjectMovements(){
+    // Change ball direction at bounds:
+    // Blue paddle (left) || red paddle (right)
+    if(ballZ > 1.5 && ballSpeed > 0.0 || ballZ < -2.0 && ballSpeed < 0.0){
+        ballSpeed *= -1.0;
+    }
+
+    // Move red paddle if triggered
+    if(move_rPad){
+        rPadZ -= rPadSpeed;
+        if(rPadZ < 1.8 && rPadSpeed > 0.0){
+            rPadSpeed *= -1.0;
+        }
+        if(rPadZ >= 2.0 && rPadSpeed < 0.0){
+            move_rPad = false;
+            rPadZ = 2.0;
+        }
+    }
+
+    // Move blue paddle if triggered
+    if(move_bPad){
+        bPadZ += bPadSpeed;
+        console.log(bPadZ);
+        if(bPadZ > 2.2 && bPadSpeed > 0.0){
+            bPadSpeed *= -1.0;
+        }
+        if(bPadZ <= 2.0 && bPadSpeed < 0.0){
+            move_bPad = false;
+            bPadZ = 2.0;
+        }
+    }
+
+    // Move ball
+    ballZ+= ballSpeed;
 }
