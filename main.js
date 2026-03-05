@@ -62,7 +62,7 @@ function main() {
     gl.uniformMatrix4fv(gl.getUniformLocation(program, 'projMatrix'), false, flatten(projMatrix));
     
     // eye coordinate
-    let lightPosition = vec4(0.0, 5.0, 3.0, 1.0 );  
+    let lightPosition = vec4(0.0, 5.0, 3.0, 1.0);
     let lightAmbient = vec4(0.2, 0.2, 0.2, 1.0 );
     let lightDiffuse = vec4(1.0, 1.0, 1.0, 1.0 );
     let lightSpecular = vec4(1.0, 1.0, 1.0, 1.0 );
@@ -129,11 +129,11 @@ function render() {
         ballDir *= -1.0;
     }
     ballZ+= ballDir;
-    cameraPos+=0.01;
+    //cameraPos+=0.005;
 
     // Create view matrix
     let viewMatrix = lookAt(
-        vec3(6.0, 4.0, 0.0),    // camera position
+        vec3(5.0, 4.0, cameraPos),    // camera position
         vec3(0.0, 0.0, 0.0),    // look at center
         vec3(0.0, 1.0, 0.0)     // up
     );
