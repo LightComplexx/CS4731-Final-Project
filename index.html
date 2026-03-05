@@ -6,26 +6,23 @@
         <script id="vshader" type="x-shader/x-vertex">
             attribute vec4 vPosition;
             attribute vec4 vNormal;
-            uniform mat4 uProjection;
-            uniform mat4 uView;
-            varying vec3 fNormal;
-            varying vec3 fPosition;
+
+            uniform mat4 modelMatrix;
+            uniform mat4 projMatrix;
+            uniform mat4 viewMatrix;
 
             void main() {
-                vec4 worldPosition = uView * vPosition;
-                fPosition = worldPosition.xyz;
-                fNormal = normalize((uView * vNormal).xyz);
-                gl_Position = uProjection * worldPosition;
+                gl_Position = projMatrix * viewMatrix * modelMatrix * vPosition;
             }
         </script>
 
         <script id="fshader" type="x-shader/x-fragment">
             precision mediump float;
-            uniform vec4 uDiffuse;
-            uniform vec4 uSpecular;
+            uniform vec4 vDiffuse;
+            uniform vec4 vSpecular;
 
             void main() {
-                 gl_FragColor = uDiffuse;
+                 gl_FragColor = vDiffuse;
             }
         </script>
 

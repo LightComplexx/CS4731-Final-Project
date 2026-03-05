@@ -7,8 +7,9 @@ let program;
 
 let vPosition;  // Vertex position attribute
 let vNormal;    // Normals position attribute
-let uDiffuse;   // Diffuse map attribute
-let uSpecular;  // Specular map attribute
+
+let ballZ = 0.0;
+let ballDir = 0.01;
 
 // Model variables
 // + Vertex position buffers for each
@@ -37,34 +38,26 @@ function main() {
         return;
     }
 
+    // Initialize shaders
+    program = initShaders(gl, "vshader", "fshader");
+    gl.useProgram(program);
+
     // Set viewport
     gl.viewport(0, 0, canvas.width, canvas.height);
 
     // Set clear color
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
-    // Initialize shaders
-    program = initShaders(gl, "vshader", "fshader");
-    gl.useProgram(program);
-
-    // Create project and view matrices
-    let projection = perspective(45, canvas.width / canvas.height, 0.1, 100);
-    let view = lookAt(
-        vec3(5, 4, 0),  // camera position
-        vec3(1, 2, 0),   // look at center
-        vec3(0, 1, 0)    // up
-    );
-
-    // Connect projection and view to vertex shader
-    let uProjection = gl.getUniformLocation(program, "uProjection");
-    let uView = gl.getUniformLocation(program, "uView");
-
-    // Send flattened projection/view matrices
-    gl.uniformMatrix4fv(uProjection, false, flatten(projection));
-    gl.uniformMatrix4fv(uView, false, flatten(view));
-
     // Enable depth testing
     gl.enable(gl.DEPTH_TEST);
+
+    // Get vertex attribute locations from shader
+    vPosition = gl.getAttribLocation(program, "vPosition");
+    vNormal = gl.getAttribLocation(program, "vNormal");
+
+    // Create project matrix
+    let projMatrix = perspective(40, 1, 0.1, 200);
+    gl.uniformMatrix4fv(gl.getUniformLocation(program, 'projMatrix'), false, flatten(projMatrix));
 
     // Get blue paddle
     pad_b = new Model(
@@ -86,16 +79,13 @@ function main() {
         "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/pong_table.obj",
         "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/pong_table.mtl");
 
-    // Call render function
-    render();
+    // Waits for model buffers to be built
+    // before rendering
+    waitForModels();
 }
 
-function render() {
-    // Clear background on each loop
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-    // Build each model buffer when both
-    // the object and material are parsed
+// Builds model buffers then calls render()
+function waitForModels() {
     if (!table_buffers && table.objParsed && table.mtlParsed)
         table_buffers = buildModelBuffers(table);
 
@@ -108,11 +98,38 @@ function render() {
     if (!ball_buffers && ball.objParsed && ball.mtlParsed)
         ball_buffers = buildModelBuffers(ball);
 
+    if(table_buffers && pad_r_buffers && pad_b_buffers && ball_buffers) {
+        render();
+    }
+    else {
+        // Loop back if all buffers aren't ready
+        requestAnimationFrame(waitForModels);
+    }
+}
+
+function render() {
+    // Ball movement
+    if(ballZ > 1.8 && ballDir > 0 || ballZ < -2 && ballDir < 0){
+        ballDir *= -1.0;
+    }
+    ballZ+= ballDir;
+
+    // Create view matrix
+    let viewMatrix = lookAt(
+        vec3(5.0, 5.0, 0.0),    // camera position
+        vec3(0.0, 0.0, 0.0),    // look at center
+        vec3(0.0, 1.0, 0.0)     // up
+    );
+    gl.uniformMatrix4fv(gl.getUniformLocation(program, 'viewMatrix'), false, flatten(viewMatrix));
+
+    // Clear background on each loop
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
     // Displays model in viewport
-    if (table_buffers) drawModel(table, table_buffers);
-    if (pad_b_buffers) drawModel(pad_b, pad_b_buffers);
-    if (pad_r_buffers) drawModel(pad_r, pad_r_buffers);
-    if (ball_buffers) drawModel(ball, ball_buffers);
+    if (table_buffers) drawModel(table, table_buffers, mat4());
+    if (pad_b_buffers) drawModel(pad_b, pad_b_buffers, mat4());
+    if (pad_r_buffers) drawModel(pad_r, pad_r_buffers, mat4());
+    if (ball_buffers) drawModel(ball, ball_buffers, translate(0, 0, ballZ));
 
     // Loops render
     requestAnimationFrame(render);
@@ -199,22 +216,20 @@ function buildModelBuffers(model) {
  *
  * @param model The model to draw.
  * @param bufferGroups List of attributes used to draw model.
+ * @param matrix Model matrix to use for movement.
  */
-function drawModel(model, bufferGroups) {
+function drawModel(model, bufferGroups, matrix) {
     // Loop through each buffer group to retrieve attribute data.
     for (let group of bufferGroups) {
-
         // Bind position buffer to vPosition program variable
-        vPosition = gl.getAttribLocation(program, "vPosition");
         gl.bindBuffer(gl.ARRAY_BUFFER, group.positionBuffer);
         gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(vPosition);
 
-        // Bind normals buffer to vNormal program variable
-        vNormal = gl.getAttribLocation(program, "vNormal");
-        gl.bindBuffer(gl.ARRAY_BUFFER, group.normalBuffer);
-        gl.vertexAttribPointer(vNormal, 4, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(vNormal);
+        // // Bind normals buffer to vNormal program variable
+        // gl.bindBuffer(gl.ARRAY_BUFFER, group.normalBuffer);
+        // gl.vertexAttribPointer(vNormal, 4, gl.FLOAT, false, 0, 0);
+        // gl.enableVertexAttribArray(vNormal);
 
         // Apply correct material
         let diffuse = model.diffuseMap.get(group.material);
@@ -222,15 +237,19 @@ function drawModel(model, bufferGroups) {
 
         // Bind diffuse map to uDiffuse program variable
         gl.uniform4fv(
-            gl.getUniformLocation(program, "uDiffuse"),
+            gl.getUniformLocation(program, "vDiffuse"),
             diffuse
         );
 
         // Bind specular map to uDiffuse program variable
         gl.uniform4fv(
-            gl.getUniformLocation(program, "uSpecular"),
+            gl.getUniformLocation(program, "vSpecular"),
             specular
         );
+
+        // Create model matrix
+        let modelMatrix = gl.getUniformLocation(program, "modelMatrix");
+        gl.uniformMatrix4fv(modelMatrix, false, flatten(matrix));
 
         // Render object to screen
         gl.drawArrays(gl.TRIANGLES, 0, group.vertexCount);
