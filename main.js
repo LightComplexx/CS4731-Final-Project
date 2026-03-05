@@ -8,6 +8,8 @@ let program;
 let vPosition;  // Vertex position attribute
 let vNormal;    // Normals position attribute
 
+let cameraPos = 0.0;
+
 let ballZ = 0.0;
 let ballDir = 0.01;
 
@@ -109,14 +111,15 @@ function waitForModels() {
 
 function render() {
     // Ball movement
-    if(ballZ > 1.8 && ballDir > 0 || ballZ < -2 && ballDir < 0){
+    if(ballZ > 1.5 && ballDir > 0 || ballZ < -2 && ballDir < 0){
         ballDir *= -1.0;
     }
     ballZ+= ballDir;
+    cameraPos+=0.01;
 
     // Create view matrix
     let viewMatrix = lookAt(
-        vec3(5.0, 5.0, 0.0),    // camera position
+        vec3(6.0, 4.0, 0.0),    // camera position
         vec3(0.0, 0.0, 0.0),    // look at center
         vec3(0.0, 1.0, 0.0)     // up
     );
@@ -125,11 +128,32 @@ function render() {
     // Clear background on each loop
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+    // Rotates blue paddle
+    let pad_b_offset = mult(
+        translate(0.0, 0.0, -2.0),
+        mult(
+            translate(0.0, 3.3, 2.0),
+            rotateX(90.0)
+        )
+    );
+
+    // Rotates red paddle
+    let pad_r_offset = mult(
+        translate(0.0, 0.0, -2.0),
+        mult(
+            translate(0.0, 2.5, 2.0),
+            mult(
+                rotateX(-90.0),
+                translate(0.0, 0.0, 0.0)
+            )
+        )
+    );
+
     // Displays model in viewport
     if (table_buffers) drawModel(table, table_buffers, mat4());
-    if (pad_b_buffers) drawModel(pad_b, pad_b_buffers, mat4());
-    if (pad_r_buffers) drawModel(pad_r, pad_r_buffers, mat4());
-    if (ball_buffers) drawModel(ball, ball_buffers, translate(0, 0, ballZ));
+    if (pad_b_buffers) drawModel(pad_b, pad_b_buffers, pad_b_offset);
+    if (pad_r_buffers) drawModel(pad_r, pad_r_buffers, pad_r_offset);
+    if (ball_buffers) drawModel(ball, ball_buffers, translate(-0.3, 0, ballZ));
 
     // Loops render
     requestAnimationFrame(render);
