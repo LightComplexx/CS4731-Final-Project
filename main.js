@@ -60,7 +60,21 @@ function main() {
     // Create project matrix
     let projMatrix = perspective(40, 1, 0.1, 200);
     gl.uniformMatrix4fv(gl.getUniformLocation(program, 'projMatrix'), false, flatten(projMatrix));
-
+    
+    // eye coordinate
+    let lightPosition = vec4(0.0, 5.0, 3.0, 1.0 );  
+    let lightAmbient = vec4(0.2, 0.2, 0.2, 1.0 );
+    let lightDiffuse = vec4(1.0, 1.0, 1.0, 1.0 );
+    let lightSpecular = vec4(1.0, 1.0, 1.0, 1.0 );
+    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(lightPosition));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightAmbient"), flatten(lightAmbient));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightDiffuse"), flatten(lightDiffuse));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightSpecular"), flatten(lightSpecular));
+    let vAmbient = vec4(0.3, 0.3, 0.3, 1.0);
+    let shininess = 60.0;
+    gl.uniform4fv(gl.getUniformLocation(program, "vAmbient"), flatten(vAmbient));
+    gl.uniform1f(gl.getUniformLocation(program, "shininess"), shininess);
+    
     // Get blue paddle
     pad_b = new Model(
         "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/paddle_blue.obj",
@@ -251,9 +265,9 @@ function drawModel(model, bufferGroups, matrix) {
         gl.enableVertexAttribArray(vPosition);
 
         // // Bind normals buffer to vNormal program variable
-        // gl.bindBuffer(gl.ARRAY_BUFFER, group.normalBuffer);
-        // gl.vertexAttribPointer(vNormal, 4, gl.FLOAT, false, 0, 0);
-        // gl.enableVertexAttribArray(vNormal);
+        gl.bindBuffer(gl.ARRAY_BUFFER, group.normalBuffer);
+        gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(vNormal);
 
         // Apply correct material
         let diffuse = model.diffuseMap.get(group.material);
