@@ -62,16 +62,18 @@ function main() {
     gl.uniformMatrix4fv(gl.getUniformLocation(program, 'projMatrix'), false, flatten(projMatrix));
     
     // eye coordinate
-    let lightPosition = vec4(0.0, 5.0, 3.0, 1.0 );  
-    let lightAmbient = vec4(0.2, 0.2, 0.2, 1.0 );
-    let lightDiffuse = vec4(1.0, 1.0, 1.0, 1.0 );
-    let lightSpecular = vec4(1.0, 1.0, 1.0, 1.0 );
+    let lightPosition = vec4(2.0, 4.0, 2.0, 1.0);;  
+    let lightAmbient  = vec4(0.2, 0.2, 0.2, 1.0);
+    let lightDiffuse  = vec4(1.0, 1.0, 1.0, 1.0);
+    let lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
+
     gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(lightPosition));
     gl.uniform4fv(gl.getUniformLocation(program, "lightAmbient"), flatten(lightAmbient));
     gl.uniform4fv(gl.getUniformLocation(program, "lightDiffuse"), flatten(lightDiffuse));
     gl.uniform4fv(gl.getUniformLocation(program, "lightSpecular"), flatten(lightSpecular));
-    let vAmbient = vec4(0.3, 0.3, 0.3, 1.0);
-    let shininess = 60.0;
+    
+    let vAmbient = vec4(0.2, 0.2, 0.2, 1.0);
+    let shininess = 40.0;
     gl.uniform4fv(gl.getUniformLocation(program, "vAmbient"), flatten(vAmbient));
     gl.uniform1f(gl.getUniformLocation(program, "shininess"), shininess);
     
