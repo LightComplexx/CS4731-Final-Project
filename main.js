@@ -275,18 +275,23 @@ function render() {
     gl.uniform1i(gl.getUniformLocation(program, "useTexture"), 1);
     if (ball_buffers) drawModel(ball, ball_buffers, ballT);
 
-    // draw mirror surface and need blend in order for us to see the ball
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    drawMirrorSurface();
-    gl.disable(gl.BLEND);
-
     // draw reflection on the top of the mirror
     gl.enable(gl.SCISSOR_TEST);
     gl.scissor(mirrorSX, mirrorSY, mirrorSW, mirrorSH);
     gl.clear(gl.DEPTH_BUFFER_BIT);
     // disable depth (reflection always on the top of the mirror)
     gl.disable(gl.DEPTH_TEST);
+
+    // Draw mirror surface
+    gl.uniform1i(gl.getUniformLocation(program, "useTexture"), 0);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    gl.disable(gl.DEPTH_TEST);
+    drawMirrorSurface();
+    gl.enable(gl.DEPTH_TEST);
+
+    gl.disable(gl.BLEND);
 
     // have bright ambient and change the light for reflection
     gl.uniform4fv(gl.getUniformLocation(program, "vAmbient"), flatten(vec4(1.0, 1.0, 1.0, 1.0)));
@@ -552,6 +557,7 @@ function buildSimpleBuffers(geo) {
     };
 }
 
+// Draws simple objects (used for flag and flagpole)
 function drawSimple(buffers, matrix) {
     gl.uniform1i(gl.getUniformLocation(program, "useTexture"), 0);
     gl.uniformMatrix4fv(gl.getUniformLocation(program, "modelMatrix"), false, flatten(matrix));
@@ -616,12 +622,12 @@ function buildMirrorBuffers() {
 
 // draw mirror surface and use light blue with a high specular
 function drawMirrorSurface() {
-    gl.bindBuffer(gl.ARRAY_BUFFER, mirrorBuffers.positionBuffer);
+    gl.bindBuffer(gl.ARRAY_BUFFER, mirrorBuffers.tempPosBuffer);
     gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vPosition);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, mirrorBuffers.normalBuffer);
-    gl.vertexAttribPointer(vNormal, 4, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, mirrorBuffers.tempNormBuffer);
+    gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vNormal);
 
     gl.uniform4fv(gl.getUniformLocation(program, "vDiffuse"), flatten(vec4(0.7, 0.88, 1.0, 0.5)));
