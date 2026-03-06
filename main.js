@@ -44,7 +44,6 @@ let skyPositionBuffer;
 let skyTexCoordBuffer;
 
 function createBallGradientTexture() {
-
     const size = 128;
     const data = new Uint8Array(size * size * 4);
 
@@ -162,8 +161,6 @@ function main() {
         configureTexture(image);
     };
 
-    gl.uniform1i(gl.getUniformLocation(program, "skyMap"), 0);
-
     // Set viewport
     gl.viewport(0, 0, canvas.width, canvas.height);
 
@@ -259,7 +256,7 @@ function drawSky() {
     gl.enableVertexAttribArray(vPosition);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, skyTexCoordBuffer);
-    gl.vertexAttribPointer(vTexCoord, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(vTexCoordSky, 2, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vTexCoordSky);
 
     let skyMatrix = mat4();
@@ -271,6 +268,8 @@ function drawSky() {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.enable(gl.DEPTH_TEST);
     gl.uniform1i(gl.getUniformLocation(program, "isSkybox"), 0);
+
+    gl.disableVertexAttribArray(vTexCoordSky);
 }
 
 function render() {
@@ -280,7 +279,7 @@ function render() {
     // Calculate object movements
     calcObjectMovements();
 
-    //cameraPos -= 0.005;
+    // cameraPos -= 0.005;
 
     // Create view matrix
     let viewMatrix = lookAt(
@@ -324,17 +323,15 @@ function render() {
     );
 
     // Displays model in viewport
+    gl.uniform1i(gl.getUniformLocation(program, "useTexture"), 0);
     if (table_buffers) drawModel(table, table_buffers, mat4());
     if (pad_b_buffers) drawModel(pad_b, pad_b_buffers, pad_b_offset);
     if (pad_r_buffers) drawModel(pad_r, pad_r_buffers, pad_r_offset);
 
-    gl.activeTexture(gl.TEXTURE0);
+    // Add gradient texture to ball before drawing
+    gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, ballTexture);
-
-    gl.uniform1i(
-        gl.getUniformLocation(program, "textureMap"),
-        0
-    );
+    gl.uniform1i(gl.getUniformLocation(program, "useTexture"), 1);
     if (ball_buffers) drawModel(ball, ball_buffers, translate(-0.3, 0, ballZ));
 
     // Loops render

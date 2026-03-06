@@ -15,7 +15,7 @@
             uniform vec3 spotlightDirection;
             uniform vec4 lightPosition;
 
-            varying vec3 L, N, V, S;
+            varying vec3 L, N, V;
             varying vec2 fTexCoord;
             varying vec2 fTexCoordSky;
 
@@ -70,10 +70,12 @@
 
             varying vec3 L, N, V;
             varying vec2 fTexCoord;
+            uniform bool useTexture;
             
             void main() {
                 if (isSkybox) {
                     gl_FragColor = texture2D(skyMap, fTexCoordSky);
+                    return;
                 } else {
                     vec3 Ln = normalize(L);
                     vec3 Nn = normalize(N);
@@ -91,7 +93,7 @@
                     }
 
                     // diffuse
-                    vec4 diffuse = 2.0 * lightDiffuse * vDiffuse * d * spotlight;
+                    vec4 diffuse = lightDiffuse * vDiffuse * d * spotlight;
             
                     // specular
                     vec4 specular = vec4(0.0);
@@ -103,9 +105,14 @@
                     vec4 fColor = vDiffuse + diffuse + specular + ambient;
 	                fColor.a = 1.0;
 
-	                vec4 texColor = texture2D(textureMap, fTexCoord);
+	                vec4 baseColor = fColor;
 
-                    gl_FragColor = texColor + fColor;
+                    if (useTexture) {
+	                    vec4 texColor = texture2D(textureMap, fTexCoord);
+	                    baseColor *= texColor;
+                    }
+
+                    gl_FragColor = baseColor;
                 }
             }
         </script>
