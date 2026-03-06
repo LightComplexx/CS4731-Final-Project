@@ -326,7 +326,7 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// For input
+// Controls camera with keyboard
 function handleCameraKeys(e) {
     switch (e.key) {
         case "ArrowUp":
@@ -351,6 +351,7 @@ function handleCameraKeys(e) {
     camY = Math.max(1.0, Math.min(8.0, camY));
 }
 
+// Gradient texture used for ball
 function createBallGradientTexture() {
     const size = 128;
     const data = new Uint8Array(size * size * 4);
@@ -400,6 +401,7 @@ function createBallGradientTexture() {
     return texture;
 }
 
+// Configures sky texture from image
 function configureTexture(image) {
     skyTexture = gl.createTexture();
 
@@ -415,6 +417,7 @@ function configureTexture(image) {
     gl.uniform1i(gl.getUniformLocation(program, "skyMap"), 0);
 }
 
+// Creates required matrices for sky background
 function createSkyBackground() {
 
     let skyVertices = [
@@ -594,7 +597,9 @@ function drawSky() {
 // build buffers for mirror
 function buildMirrorBuffers() {
     let positions = [
-        vec4(MX, MY_BOT, MZ_MIN, 1), vec4(MX, MY_TOP, MZ_MIN, 1), vec4(MX, MY_TOP, MZ_MAX, 1), vec4(MX, MY_BOT, MZ_MIN, 1), vec4(MX, MY_TOP, MZ_MAX, 1), vec4(MX, MY_BOT, MZ_MAX, 1),
+        vec4(MX, MY_BOT, MZ_MIN, 1), vec4(MX, MY_TOP, MZ_MIN, 1),
+        vec4(MX, MY_TOP, MZ_MAX, 1), vec4(MX, MY_BOT, MZ_MIN, 1),
+        vec4(MX, MY_TOP, MZ_MAX, 1), vec4(MX, MY_BOT, MZ_MAX, 1),
     ];
     let normals = Array(6).fill(null).map(() => vec3(1, 0, 0));
     let tempPosBuffer = gl.createBuffer();
