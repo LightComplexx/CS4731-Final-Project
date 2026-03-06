@@ -70,7 +70,7 @@ function main() {
     gl.uniformMatrix4fv(gl.getUniformLocation(program, 'projMatrix'), false, flatten(projMatrix));
 
     // eye coordinate
-    let lightPosition = vec4(2.0, 4.0, 2.0, 1.0);;
+    let lightPosition = vec4(0.0, 0.0, 0.0, 1.0);
     let lightAmbient  = vec4(0.2, 0.2, 0.2, 1.0);
     let lightDiffuse  = vec4(1.0, 1.0, 1.0, 1.0);
     let lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
@@ -140,9 +140,11 @@ function render() {
     // Calculate object movements
     calcObjectMovements();
 
+    //cameraPos -= 0.005;
+
     // Create view matrix
     let viewMatrix = lookAt(
-        vec3(6.0, 4.0, 0.0),    // camera position
+        vec3(6.0, 4.0, cameraPos),    // camera position
         vec3(0.0, 0.0, 0.0),    // look at center
         vec3(0.0, 1.0, 0.0)     // up
     );
@@ -341,7 +343,7 @@ function calcObjectMovements(){
     // Move red paddle if triggered
     if(move_rPad){
         rPadZ -= rPadSpeed;
-        if(rPadZ < 1.8 && rPadSpeed > 0.0){
+        if(rPadZ < 1.82 && rPadSpeed > 0.0){
             rPadSpeed *= -1.0;
         }
         if(rPadZ >= 2.0 && rPadSpeed < 0.0){
@@ -354,7 +356,7 @@ function calcObjectMovements(){
     if(move_bPad){
         bPadZ += bPadSpeed;
         console.log(bPadZ);
-        if(bPadZ > 2.2 && bPadSpeed > 0.0){
+        if(bPadZ > 2.17 && bPadSpeed > 0.0){
             bPadSpeed *= -1.0;
         }
         if(bPadZ <= 2.0 && bPadSpeed < 0.0){
