@@ -10,8 +10,8 @@
             uniform mat4 modelMatrix;
             uniform mat4 projMatrix;
             uniform mat4 viewMatrix;
-
-            varying vec3 L, N, V;
+            uniform vec3 spotlightDirection;
+            varying vec3 L, N, V, S;
             uniform vec4 lightPosition;
 
             void main() {
@@ -46,6 +46,9 @@
 
             uniform float shininess;
 
+            uniform vec3 spotlightDirection; 
+            uniform float spotlightCutoff;
+
             varying vec3 L, N, V;
             
             void main() {
@@ -54,9 +57,18 @@
             vec3 Vn = normalize(V);
 
             float d = max(dot(Ln, Nn), 0.0);
+            float spotlight = max(dot(normalize(-Ln), normalize(spotlightDirection)), 0.0);
+
+            // ambient
+            vec4 ambient = lightAmbient * vAmbient; 
+
+            if (spotlight < spotlightCutoff) {
+                gl_FragColor = ambient;
+                return;
+            }
 
             // diffuse
-            vec4 diffuse = 2.0 * lightDiffuse * vDiffuse * d;
+            vec4 diffuse = 2.0 * lightDiffuse * vDiffuse * d * spotlight;
             
             // specular
             vec4 specular = vec4(0.0);
@@ -64,9 +76,6 @@
                 vec3 R = reflect(-Ln, Nn);
                 specular = lightSpecular * vSpecular * pow(max(dot(Vn, R), 0.0), shininess);
             }
-
-            // ambient
-            vec4 ambient = lightAmbient * vAmbient;
 
             vec4 fColor = diffuse + specular + ambient;
 	        fColor.a = 1.0;
