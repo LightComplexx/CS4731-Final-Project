@@ -7,7 +7,8 @@
             attribute vec4 vPosition;
             attribute vec4 vNormal;
             attribute vec2 vTexCoord;
-            
+            attribute vec2 vTexCoordSky;
+
             uniform mat4 modelMatrix;
             uniform mat4 projMatrix;
             uniform mat4 viewMatrix;
@@ -16,11 +17,17 @@
 
             varying vec3 L, N, V, S;
             varying vec2 fTexCoord;
+            varying vec2 fTexCoordSky;
+
+            uniform bool isSkybox;
 
             void main() {
+                if (isSkybox) {
+                    fTexCoordSky = vTexCoordSky;
+                    gl_Position = projMatrix * viewMatrix * modelMatrix * vPosition;
                 // convert normal position to calc lightning vector
-                mat4 modelViewMatrix = viewMatrix * modelMatrix;
-
+                } else {
+                    mat4 modelViewMatrix = viewMatrix * modelMatrix;
                 vec3 pos = (modelViewMatrix * vPosition).xyz;
                 vec3 lightPositionEye = (viewMatrix * lightPosition).xyz;
 
@@ -33,9 +40,9 @@
                 // view vector
                 V = normalize(-pos);
 
-                vec4 worldPosition = modelViewMatrix * vPosition;
-                gl_Position = projMatrix * worldPosition;
+                gl_Position = projMatrix * modelViewMatrix * vPosition;
                 fTexCoord = vTexCoord;
+                }
             }
         </script>
 
@@ -57,41 +64,50 @@
             uniform vec3 spotlightDirection;
             uniform float spotlightCutoff;
 
+            varying vec2 fTexCoordSky;
+            uniform sampler2D skyMap;
+            uniform bool isSkybox;
+
             varying vec3 L, N, V;
             varying vec2 fTexCoord;
             
             void main() {
-            vec3 Ln = normalize(L);
-            vec3 Nn = normalize(N);
-            vec3 Vn = normalize(V);
+                if (isSkybox) {
+                    gl_FragColor = texture2D(skyMap, fTexCoordSky);
+                } else {
+                    vec3 Ln = normalize(L);
+                    vec3 Nn = normalize(N);
+                    vec3 Vn = normalize(V);
 
-            float d = max(dot(Ln, Nn), 0.0);
-            float spotlight = max(dot(normalize(-Ln), normalize(spotlightDirection)), 0.0);
+                    float d = max(dot(Ln, Nn), 0.0);
+                    float spotlight = max(dot(normalize(-Ln), normalize(spotlightDirection)), 0.0);
 
-            // ambient
-            vec4 ambient = lightAmbient * vAmbient;
+                    // ambient
+                    vec4 ambient = lightAmbient * vAmbient;
 
-            if (spotlight < spotlightCutoff) {
-                gl_FragColor = ambient;
-                return;
-            }
+                    if (spotlight < spotlightCutoff) {
+                        gl_FragColor = ambient;
+                        return;
+                    }
 
-            // diffuse
-            vec4 diffuse = lightDiffuse * vDiffuse * d * spotlight;
+                    // diffuse
+                    vec4 diffuse = 2.0 * lightDiffuse * vDiffuse * d * spotlight;
             
-            // specular
-            vec4 specular = vec4(0.0);
-            if (d > 0.0) {
-                vec3 R = reflect(-Ln, Nn);
-                specular = lightSpecular * vSpecular * pow(max(dot(Vn, R), 0.0), shininess);
+                    // specular
+                    vec4 specular = vec4(0.0);
+                    if (d > 0.0) {
+                        vec3 R = reflect(-Ln, Nn);
+                        specular = lightSpecular * vSpecular * pow(max(dot(Vn, R), 0.0), shininess);
+                    }
+
+                    vec4 fColor = vDiffuse + diffuse + specular + ambient;
+	                fColor.a = 1.0;
+
+	                vec4 texColor = texture2D(textureMap, fTexCoord);
+
+                    gl_FragColor = texColor + fLighting;
+                }
             }
-
-            vec4 fLighting = vDiffuse + diffuse + specular + ambient;
-
-            vec4 texColor = texture2D(textureMap, fTexCoord);
-
-            gl_FragColor = texColor * fLighting;
-        }
         </script>
 
         <script type="text/javascript" src="lib/webgl-utils.js"></script>
