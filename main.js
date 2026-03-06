@@ -9,7 +9,8 @@ let vPosition;  // Vertex position attribute
 let vNormal;    // Normals position attribute
 let vTexCoord;  // Texture coordinates attribute
 
-let cameraPos = 0.0;
+let camAngle = 0.0;
+let camRadius = 8.0;
 
 let ballZ = 0.0;
 let ballSpeed = 0.01;
@@ -279,15 +280,8 @@ function render() {
     // Calculate object movements
     calcObjectMovements();
 
-    // cameraPos -= 0.005;
-
-    // Create view matrix
-    let viewMatrix = lookAt(
-        vec3(6.0, 4.0, cameraPos),    // camera position
-        vec3(0.0, 0.5, 0.0),    // look at center
-        vec3(0.0, 1.0, 0.0)     // up
-    );
-    gl.uniformMatrix4fv(gl.getUniformLocation(program, 'viewMatrix'), false, flatten(viewMatrix));
+    // Move camera
+    moveCamera(true);
 
     // spotlight on the ball (following it)
     let lightPosition = vec4(-0.3, 3.0, ballZ, 1.0);
@@ -535,4 +529,38 @@ function calcObjectMovements(){
 
     // Move ball
     ballZ+= ballSpeed;
+}
+
+/**
+ * Spins the camera around the table.
+ * @param move Flag for camera movement.
+ */
+function moveCamera(move){
+    let camX;
+    let camY;
+    let camZ;
+
+    if(move){
+        camAngle += 0.001;
+        camX = camRadius * Math.sin(camAngle);
+        camZ = camRadius * Math.cos(camAngle);
+        camY = 3.0;
+    } else {
+        camX = 6.0;
+        camZ = 0.0;
+        camY = 3.0;
+    }
+
+    // Create view matrix
+    let viewMatrix = lookAt(
+        vec3(camX, camY, camZ),     // camera position
+        vec3(0.0, 0.5, 0.0),        // look at center
+        vec3(0.0, 1.0, 0.0)         // up
+    );
+
+    gl.uniformMatrix4fv(
+        gl.getUniformLocation(program,'viewMatrix'),
+        false,
+        flatten(viewMatrix)
+    );
 }
