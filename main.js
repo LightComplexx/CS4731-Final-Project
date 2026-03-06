@@ -527,7 +527,6 @@ function calcObjectMovements(){
     // Move blue paddle if triggered
     if(move_bPad){
         bPadZ += bPadSpeed;
-        console.log(bPadZ);
         if(bPadZ > 2.17 && bPadSpeed > 0.0){
             bPadSpeed *= -1.0;
         }
