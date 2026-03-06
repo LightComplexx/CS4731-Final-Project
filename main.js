@@ -35,6 +35,56 @@ let ball_buffers;
 let table;
 let table_buffers;
 
+// Skybox variables
+let vTexCoord;
+let skyTexture;
+let skyPositionBuffer;
+let skyTexCoordBuffer;
+
+function configureTexture(image) {
+    skyTexture = gl.createTexture();
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, skyTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    gl.uniform1i(gl.getUniformLocation(program, "skyMap"), 0);
+}
+
+function createSkyBackground() {
+
+    let skyVertices = [
+        vec4(-25.0,  10.0, -15.0, 1.0),
+        vec4(-25.0,  10.0,  15.0, 1.0),
+        vec4(-25.0, -10.0,  15.0, 1.0),
+        vec4(-25.0,  10.0, -15.0, 1.0),
+        vec4(-25.0, -10.0,  15.0, 1.0),
+        vec4(-25.0, -10.0, -15.0, 1.0)
+    ];
+
+    let skyTexCoords = [
+        vec2(0.0,1.0),
+        vec2(1.0,1.0),
+        vec2(1.0,0.0),
+        vec2(0.0,1.0),
+        vec2(1.0,0.0),
+        vec2(0.0,0.0)
+    ];
+
+    skyPositionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, skyPositionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(skyVertices), gl.STATIC_DRAW);
+
+    skyTexCoordBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, skyTexCoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(skyTexCoords), gl.STATIC_DRAW);
+}
+
 function main() {
     // Retrieve <canvas> element
     canvas = document.getElementById('webgl');
@@ -51,6 +101,18 @@ function main() {
     // Initialize shaders
     program = initShaders(gl, "vshader", "fshader");
     gl.useProgram(program);
+
+    vTexCoord = gl.getAttribLocation(program, "vTexCoord");
+
+    createSkyBackground();
+    let image = new Image();
+    image.crossOrigin = "";
+    image.src = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/July_night_sky_%2835972569256%29.jpg/960px-July_night_sky_%2835972569256%29.jpg";  
+    image.onload = function() {
+        configureTexture(image);
+    };
+
+    gl.uniform1i(gl.getUniformLocation(program, "skyMap"), 0);
 
     // Set viewport
     gl.viewport(0, 0, canvas.width, canvas.height);
@@ -71,7 +133,7 @@ function main() {
 
     // eye coordinate
     let lightPosition = vec4(2.0, 4.0, 2.0, 1.0);;
-    let lightAmbient  = vec4(0.2, 0.2, 0.2, 1.0);
+    let lightAmbient  = vec4(0.5, 0.5, 0.5, 1.0);
     let lightDiffuse  = vec4(1.0, 1.0, 1.0, 1.0);
     let lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 
@@ -80,7 +142,7 @@ function main() {
     gl.uniform4fv(gl.getUniformLocation(program, "lightDiffuse"), flatten(lightDiffuse));
     gl.uniform4fv(gl.getUniformLocation(program, "lightSpecular"), flatten(lightSpecular));
 
-    let vAmbient = vec4(0.2, 0.2, 0.2, 1.0);
+    let vAmbient = vec4(0.4, 0.4, 0.4, 1.0);
     let shininess = 40.0;
     gl.uniform4fv(gl.getUniformLocation(program, "vAmbient"), flatten(vAmbient));
     gl.uniform1f(gl.getUniformLocation(program, "shininess"), shininess);
@@ -133,6 +195,29 @@ function waitForModels() {
     }
 }
 
+function drawSky() {
+    gl.uniform1i(gl.getUniformLocation(program, "isSkybox"), 1);
+    gl.disable(gl.DEPTH_TEST);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, skyPositionBuffer);
+    gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vPosition);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, skyTexCoordBuffer);
+    gl.vertexAttribPointer(vTexCoord, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vTexCoord);
+
+    let skyMatrix = mat4();
+    gl.uniformMatrix4fv(gl.getUniformLocation(program, "modelMatrix"), false, flatten(skyMatrix));
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, skyTexture);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.enable(gl.DEPTH_TEST);
+    gl.uniform1i(gl.getUniformLocation(program, "isSkybox"), 0);
+}
+
 function render() {
     // Check for paddle trigger
     padTrigger();
@@ -148,8 +233,17 @@ function render() {
     );
     gl.uniformMatrix4fv(gl.getUniformLocation(program, 'viewMatrix'), false, flatten(viewMatrix));
 
+    // spotlight on the ball (following it)
+    let lightPosition = vec4(-0.3, 3.0, ballZ, 1.0);
+    gl.uniform4fv(gl.getUniformLocation(program,"lightPosition"), flatten(lightPosition));
+    let spotlightDirection = vec3(0.0, -1.0, 0.0);
+    gl.uniform3fv(gl.getUniformLocation(program,"spotlightDirection"), flatten(spotlightDirection));
+    gl.uniform1f(gl.getUniformLocation(program, "spotlightCutoff"), 0.85);
+
     // Clear background on each loop
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    drawSky();
 
     // Rotates blue paddle
     let pad_b_offset = mult(
