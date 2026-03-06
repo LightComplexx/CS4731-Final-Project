@@ -9,6 +9,7 @@ let vPosition;  // Vertex position attribute
 let vNormal;    // Normals position attribute
 let vTexCoord;  // Texture coordinates attribute
 
+// Movement variables for paddles and ball
 let ballZ = 0.0;
 let ballSpeed = 0.01;
 
@@ -45,10 +46,10 @@ let flagPoleSpeed = 1.5;
 let flagAngle = 0.0;
 let flagSpeed = 2.0;
 
+// Camera movement variables
 let camX = 6.0;
 let camY = 4.0;
 let camZ = 0.0;
-
 let camSpeed = 0.2;
 
 // Skybox variables
@@ -56,99 +57,6 @@ let vTexCoordSky;
 let skyTexture;
 let skyPositionBuffer;
 let skyTexCoordBuffer;
-
-function createBallGradientTexture() {
-    const size = 128;
-    const data = new Uint8Array(size * size * 4);
-
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-
-            let dx = (x - size/2) / (size/2);
-            let dy = (y - size/2) / (size/2);
-
-            let dist = Math.sqrt(dx*dx + dy*dy);
-
-            // Clamp distance
-            dist = Math.min(dist, 1.0);
-
-            // Gradient value
-            let brightness = 1.0 - dist;
-
-            let color = brightness * 255;
-
-            let index = (y * size + x) * 4;
-
-            data[index] = color;      // R
-            data[index+1] = color;    // G
-            data[index+2] = color;    // B
-            data[index+3] = 255;      // A
-        }
-    }
-
-    let texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-
-    gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.RGBA,
-        size,
-        size,
-        0,
-        gl.RGBA,
-        gl.UNSIGNED_BYTE,
-        data
-    );
-
-    gl.generateMipmap(gl.TEXTURE_2D);
-
-    return texture;
-}
-
-function configureTexture(image) {
-    skyTexture = gl.createTexture();
-
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, skyTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
-
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-    gl.uniform1i(gl.getUniformLocation(program, "skyMap"), 0);
-}
-
-function createSkyBackground() {
-
-    let skyVertices = [
-        vec4(-25.0,  10.0, -15.0, 1.0),
-        vec4(-25.0,  10.0,  15.0, 1.0),
-        vec4(-25.0, -10.0,  15.0, 1.0),
-        vec4(-25.0,  10.0, -15.0, 1.0),
-        vec4(-25.0, -10.0,  15.0, 1.0),
-        vec4(-25.0, -10.0, -15.0, 1.0)
-    ];
-
-    let skyTexCoords = [
-        vec2(0.0,1.0),
-        vec2(1.0,1.0),
-        vec2(1.0,0.0),
-        vec2(0.0,1.0),
-        vec2(1.0,0.0),
-        vec2(0.0,0.0)
-    ];
-
-    skyPositionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, skyPositionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(skyVertices), gl.STATIC_DRAW);
-
-    skyTexCoordBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, skyTexCoordBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(skyTexCoords), gl.STATIC_DRAW);
-}
 
 function main() {
     // Retrieve <canvas> element
@@ -246,31 +154,6 @@ function main() {
     waitForModels();
 }
 
-// For input
-function handleCameraKeys(e) {
-    switch (e.key) {
-        case "ArrowUp":
-            camY += camSpeed;
-            break;
-
-        case "ArrowDown":
-            camY -= camSpeed;
-            break;
-
-        case "ArrowLeft":
-            camZ += camSpeed;
-            break;
-
-        case "ArrowRight":
-            camZ -= camSpeed;
-            break;
-    }
-
-    // Clamp bounds
-    camZ = Math.max(-10.0, Math.min(10.0, camZ));
-    camY = Math.max(1.0, Math.min(8.0, camY));
-}
-
 // Builds model buffers then calls render()
 function waitForModels() {
     if (!table_buffers && table.objParsed && table.mtlParsed)
@@ -294,152 +177,6 @@ function waitForModels() {
     }
 }
 
-// Cylinder for flagpole
-
-function buildCylinder(radius, height, segments) {
-    let positions = [];
-    let normals = [];
-
-    for (let i = 0; i < segments; i++) {
-        let a = (i / segments) * 2 * Math.PI;
-        let b = ((i + 1) / segments) * 2 * Math.PI;
-
-        let x1 = radius * Math.cos(a);
-        let z1 = radius * Math.sin(a);
-        let x2 = radius * Math.cos(b);
-        let z2 = radius * Math.sin(b);
-
-        // Two triangles per quad
-        let top1 = vec4(x1, height, z1, 1);
-        let top2 = vec4(x2, height, z2, 1);
-        let bot1 = vec4(x1, 0, z1, 1);
-        let bot2 = vec4(x2, 0, z2, 1);
-
-        // Normals (side)
-        let n1 = normalize(vec3(x1, 0, z1));
-        let n2 = normalize(vec3(x2, 0, z2));
-
-        // Triangle 1
-        positions.push(top1, bot1, bot2);
-        normals.push(n1, n1, n2);
-
-        // Triangle 2
-        positions.push(top1, bot2, top2);
-        normals.push(n1, n2, n2);
-    }
-
-    return { positions, normals };
-}
-
-function buildFlag(width, height, thickness) {
-    let w = width / 2;
-    let h = height / 2;
-    let t = thickness / 2;
-
-    // Rectangular prism for flag
-    let verts = [
-        // Front
-        [-w, -h,  t], [ w, -h,  t], [ w,  h,  t],
-        [-w, -h,  t], [ w,  h,  t], [-w,  h,  t],
-
-        // Back
-        [-w, -h, -t], [ w, -h, -t], [ w,  h, -t],
-        [-w, -h, -t], [ w,  h, -t], [-w,  h, -t],
-
-        // Left
-        [-w, -h, -t], [-w, -h,  t], [-w,  h,  t],
-        [-w, -h, -t], [-w,  h,  t], [-w,  h, -t],
-
-        // Right
-        [ w, -h, -t], [ w, -h,  t], [ w,  h,  t],
-        [ w, -h, -t], [ w,  h,  t], [ w,  h, -t],
-
-        // Top
-        [-w,  h, -t], [ w,  h, -t], [ w,  h,  t],
-        [-w,  h, -t], [ w,  h,  t], [-w,  h,  t],
-
-        // Bottom
-        [-w, -h, -t], [ w, -h, -t], [ w, -h,  t],
-        [-w, -h, -t], [ w, -h,  t], [-w, -h,  t],
-    ];
-
-    let positions = [];
-    let normals = [];
-
-    for (let i = 0; i < verts.length; i += 3) {
-        let a = vec4(...verts[i], 1);
-        let b = vec4(...verts[i+1], 1);
-        let c = vec4(...verts[i+2], 1);
-
-        positions.push(a, b, c);
-
-        // Flat normal
-        let n = normalize(cross(subtract(b, a), subtract(c, a)));
-        normals.push(vec4(n, 0), vec4(n, 0), vec4(n, 0));
-    }
-
-    return { positions, normals };
-}
-
-// For building the simple shapes
-function buildSimpleBuffers(geo) {
-    let posBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(geo.positions), gl.STATIC_DRAW);
-
-    let normBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, normBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(geo.normals), gl.STATIC_DRAW);
-
-    return {
-        pos: posBuf,
-        norm: normBuf,
-        count: geo.positions.length
-    };
-}
-
-function drawSimple(buffers, matrix) {
-    gl.uniformMatrix4fv(gl.getUniformLocation(program, "modelMatrix"), false, flatten(matrix));
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.pos);
-    gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(vPosition);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.norm);
-    gl.vertexAttribPointer(vNormal, 4, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(vNormal);
-
-    gl.uniform4fv(gl.getUniformLocation(program, "vDiffuse"), flatten(vec4(0.8,0.8,0.8,1)));
-    gl.uniform4fv(gl.getUniformLocation(program, "vSpecular"), flatten(vec4(1,1,1,1)));
-
-    gl.drawArrays(gl.TRIANGLES, 0, buffers.count);
-}
-
-function drawSky() {
-    gl.uniform1i(gl.getUniformLocation(program, "isSkybox"), 1);
-    gl.disable(gl.DEPTH_TEST);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, skyPositionBuffer);
-    gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(vPosition);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, skyTexCoordBuffer);
-    gl.vertexAttribPointer(vTexCoordSky, 2, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(vTexCoordSky);
-
-    let skyMatrix = mat4();
-    gl.uniformMatrix4fv(gl.getUniformLocation(program, "modelMatrix"), false, flatten(skyMatrix));
-
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, skyTexture);
-
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    gl.enable(gl.DEPTH_TEST);
-    gl.uniform1i(gl.getUniformLocation(program, "isSkybox"), 0);
-
-    gl.disableVertexAttribArray(vTexCoordSky);
-}
-
 function render() {
     // Check for paddle trigger
     padTrigger();
@@ -447,7 +184,7 @@ function render() {
     // Calculate object movements
     calcObjectMovements();
 
-    // Create view matrix
+    // Create camera view matrix
     let viewMatrix = lookAt(
         vec3(camX, camY, camZ),    // camera position
         vec3(0.0, 0.0, 0.0),   // always look at center
@@ -456,7 +193,7 @@ function render() {
     gl.uniformMatrix4fv(gl.getUniformLocation(program, 'viewMatrix'), false, flatten(viewMatrix));
 
     // spotlight on the ball (following it)
-    let lightPosition = vec4(-0.3, 3.0, ballZ, 1.0);
+    let lightPosition = vec4(-2.3, 5.0, ballZ, 1.0);
     gl.uniform4fv(gl.getUniformLocation(program,"lightPosition"), flatten(lightPosition));
     let spotlightDirection = vec3(0.0, -1.0, 0.0);
     gl.uniform3fv(gl.getUniformLocation(program,"spotlightDirection"), flatten(spotlightDirection));
@@ -530,6 +267,272 @@ function render() {
 
     // Loops render
     requestAnimationFrame(render);
+}
+
+function createBallGradientTexture() {
+    const size = 128;
+    const data = new Uint8Array(size * size * 4);
+
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+
+            let dx = (x - size/2) / (size/2);
+            let dy = (y - size/2) / (size/2);
+
+            let dist = Math.sqrt(dx*dx + dy*dy);
+
+            // Clamp distance
+            dist = Math.min(dist, 1.0);
+
+            // Gradient value
+            let brightness = 1.0 - dist;
+
+            let color = brightness * 255;
+
+            let index = (y * size + x) * 4;
+
+            data[index] = color;      // R
+            data[index+1] = color;    // G
+            data[index+2] = color;    // B
+            data[index+3] = 255;      // A
+        }
+    }
+
+    let texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        size,
+        size,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        data
+    );
+
+    gl.generateMipmap(gl.TEXTURE_2D);
+
+    return texture;
+}
+
+function configureTexture(image) {
+    skyTexture = gl.createTexture();
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, skyTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    gl.uniform1i(gl.getUniformLocation(program, "skyMap"), 0);
+}
+
+function createSkyBackground() {
+
+    let skyVertices = [
+        vec4(-25.0,  10.0, -15.0, 1.0),
+        vec4(-25.0,  10.0,  15.0, 1.0),
+        vec4(-25.0, -10.0,  15.0, 1.0),
+        vec4(-25.0,  10.0, -15.0, 1.0),
+        vec4(-25.0, -10.0,  15.0, 1.0),
+        vec4(-25.0, -10.0, -15.0, 1.0)
+    ];
+
+    let skyTexCoords = [
+        vec2(0.0,1.0),
+        vec2(1.0,1.0),
+        vec2(1.0,0.0),
+        vec2(0.0,1.0),
+        vec2(1.0,0.0),
+        vec2(0.0,0.0)
+    ];
+
+    skyPositionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, skyPositionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(skyVertices), gl.STATIC_DRAW);
+
+    skyTexCoordBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, skyTexCoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(skyTexCoords), gl.STATIC_DRAW);
+}
+
+
+// For input
+function handleCameraKeys(e) {
+    switch (e.key) {
+        case "ArrowUp":
+            camY += camSpeed;
+            break;
+
+        case "ArrowDown":
+            camY -= camSpeed;
+            break;
+
+        case "ArrowLeft":
+            camZ += camSpeed;
+            break;
+
+        case "ArrowRight":
+            camZ -= camSpeed;
+            break;
+    }
+
+    // Clamp bounds
+    camZ = Math.max(-10.0, Math.min(10.0, camZ));
+    camY = Math.max(1.0, Math.min(8.0, camY));
+}
+
+// Cylinder for flagpole
+function buildCylinder(radius, height, segments) {
+    let positions = [];
+    let normals = [];
+
+    for (let i = 0; i < segments; i++) {
+        let a = (i / segments) * 2 * Math.PI;
+        let b = ((i + 1) / segments) * 2 * Math.PI;
+
+        let x1 = radius * Math.cos(a);
+        let z1 = radius * Math.sin(a);
+        let x2 = radius * Math.cos(b);
+        let z2 = radius * Math.sin(b);
+
+        // Two triangles per quad
+        let top1 = vec4(x1, height, z1, 1);
+        let top2 = vec4(x2, height, z2, 1);
+        let bot1 = vec4(x1, 0, z1, 1);
+        let bot2 = vec4(x2, 0, z2, 1);
+
+        // Normals (side)
+        let n1 = normalize(vec3(x1, 0, z1));
+        let n2 = normalize(vec3(x2, 0, z2));
+
+        // Triangle 1
+        positions.push(top1, bot1, bot2);
+        normals.push(n1, n1, n2);
+
+        // Triangle 2
+        positions.push(top1, bot2, top2);
+        normals.push(n1, n2, n2);
+    }
+
+    return { positions, normals };
+}
+
+// Flag for flagpole
+function buildFlag(width, height, thickness) {
+    let w = width / 2;
+    let h = height / 2;
+    let t = thickness / 2;
+
+    // Rectangular prism for flag
+    let verts = [
+        // Front
+        [-w, -h,  t], [ w, -h,  t], [ w,  h,  t],
+        [-w, -h,  t], [ w,  h,  t], [-w,  h,  t],
+
+        // Back
+        [-w, -h, -t], [ w, -h, -t], [ w,  h, -t],
+        [-w, -h, -t], [ w,  h, -t], [-w,  h, -t],
+
+        // Left
+        [-w, -h, -t], [-w, -h,  t], [-w,  h,  t],
+        [-w, -h, -t], [-w,  h,  t], [-w,  h, -t],
+
+        // Right
+        [ w, -h, -t], [ w, -h,  t], [ w,  h,  t],
+        [ w, -h, -t], [ w,  h,  t], [ w,  h, -t],
+
+        // Top
+        [-w,  h, -t], [ w,  h, -t], [ w,  h,  t],
+        [-w,  h, -t], [ w,  h,  t], [-w,  h,  t],
+
+        // Bottom
+        [-w, -h, -t], [ w, -h, -t], [ w, -h,  t],
+        [-w, -h, -t], [ w, -h,  t], [-w, -h,  t],
+    ];
+
+    let positions = [];
+    let normals = [];
+
+    for (let i = 0; i < verts.length; i += 3) {
+        let a = vec4(...verts[i], 1);
+        let b = vec4(...verts[i+1], 1);
+        let c = vec4(...verts[i+2], 1);
+
+        positions.push(a, b, c);
+
+        // Flat normal
+        let n = normalize(cross(subtract(b, a), subtract(c, a)));
+        normals.push(vec4(n, 0), vec4(n, 0), vec4(n, 0));
+    }
+
+    return { positions, normals };
+}
+
+// For building the simple shapes
+function buildSimpleBuffers(geo) {
+    let posBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(geo.positions), gl.STATIC_DRAW);
+
+    let normBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, normBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(geo.normals), gl.STATIC_DRAW);
+
+    return {
+        pos: posBuf,
+        norm: normBuf,
+        count: geo.positions.length
+    };
+}
+
+function drawSimple(buffers, matrix) {
+    gl.uniform1i(gl.getUniformLocation(program, "useTexture"), 0);
+    gl.uniformMatrix4fv(gl.getUniformLocation(program, "modelMatrix"), false, flatten(matrix));
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.pos);
+    gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vPosition);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.norm);
+    gl.vertexAttribPointer(vNormal, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vNormal);
+
+    gl.uniform4fv(gl.getUniformLocation(program, "vDiffuse"), flatten(vec4(0.8,0.8,0.8,1)));
+    gl.uniform4fv(gl.getUniformLocation(program, "vSpecular"), flatten(vec4(1,1,1,1)));
+
+    gl.drawArrays(gl.TRIANGLES, 0, buffers.count);
+}
+
+function drawSky() {
+    gl.uniform1i(gl.getUniformLocation(program, "isSkybox"), 1);
+    gl.disable(gl.DEPTH_TEST);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, skyPositionBuffer);
+    gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vPosition);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, skyTexCoordBuffer);
+    gl.vertexAttribPointer(vTexCoordSky, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vTexCoordSky);
+
+    let skyMatrix = mat4();
+    gl.uniformMatrix4fv(gl.getUniformLocation(program, "modelMatrix"), false, flatten(skyMatrix));
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, skyTexture);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.enable(gl.DEPTH_TEST);
+    gl.uniform1i(gl.getUniformLocation(program, "isSkybox"), 0);
+
+    gl.disableVertexAttribArray(vTexCoordSky);
 }
 
 /**
