@@ -7,6 +7,7 @@ let program;
 
 let vPosition;  // Vertex position attribute
 let vNormal;    // Normals position attribute
+let vTexCoord;  // Texture coordinates attribute
 
 let cameraPos = 0.0;
 
@@ -31,9 +32,60 @@ let pad_r_buffers;
 
 let ball;
 let ball_buffers;
+let ballTexture;
 
 let table;
 let table_buffers;
+
+function createBallGradientTexture() {
+
+    const size = 128;
+    const data = new Uint8Array(size * size * 4);
+
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+
+            let dx = (x - size/2) / (size/2);
+            let dy = (y - size/2) / (size/2);
+
+            let dist = Math.sqrt(dx*dx + dy*dy);
+
+            // Clamp distance
+            dist = Math.min(dist, 1.0);
+
+            // Gradient value
+            let brightness = 1.0 - dist;
+
+            let color = brightness * 255;
+
+            let index = (y * size + x) * 4;
+
+            data[index] = color;      // R
+            data[index+1] = color;    // G
+            data[index+2] = color;    // B
+            data[index+3] = 255;      // A
+        }
+    }
+
+    let texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        size,
+        size,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        data
+    );
+
+    gl.generateMipmap(gl.TEXTURE_2D);
+
+    return texture;
+}
 
 function main() {
     // Retrieve <canvas> element
@@ -64,13 +116,14 @@ function main() {
     // Get vertex attribute locations from shader
     vPosition = gl.getAttribLocation(program, "vPosition");
     vNormal = gl.getAttribLocation(program, "vNormal");
+    vTexCoord = gl.getAttribLocation(program, "vTexCoord");
 
     // Create project matrix
     let projMatrix = perspective(40, 1, 0.1, 200);
     gl.uniformMatrix4fv(gl.getUniformLocation(program, 'projMatrix'), false, flatten(projMatrix));
 
     // eye coordinate
-    let lightPosition = vec4(2.0, 4.0, 2.0, 1.0);;
+    let lightPosition = vec4(2.0, 4.0, 2.0, 1.0);
     let lightAmbient  = vec4(0.5, 0.5, 0.5, 1.0);
     let lightDiffuse  = vec4(1.0, 1.0, 1.0, 1.0);
     let lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
@@ -104,6 +157,9 @@ function main() {
     table = new Model(
         "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/pong_table.obj",
         "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/pong_table.mtl");
+
+    // Create ball texture
+    ballTexture = createBallGradientTexture();
 
     // Waits for model buffers to be built
     // before rendering
@@ -145,7 +201,7 @@ function render() {
     // Create view matrix
     let viewMatrix = lookAt(
         vec3(6.0, 4.0, cameraPos),    // camera position
-        vec3(0.0, 0.0, 0.0),    // look at center
+        vec3(0.0, 0.5, 0.0),    // look at center
         vec3(0.0, 1.0, 0.0)     // up
     );
     gl.uniformMatrix4fv(gl.getUniformLocation(program, 'viewMatrix'), false, flatten(viewMatrix));
@@ -185,6 +241,14 @@ function render() {
     if (table_buffers) drawModel(table, table_buffers, mat4());
     if (pad_b_buffers) drawModel(pad_b, pad_b_buffers, pad_b_offset);
     if (pad_r_buffers) drawModel(pad_r, pad_r_buffers, pad_r_offset);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, ballTexture);
+
+    gl.uniform1i(
+        gl.getUniformLocation(program, "textureMap"),
+        0
+    );
     if (ball_buffers) drawModel(ball, ball_buffers, translate(-0.3, 0, ballZ));
 
     // Loops render
@@ -230,6 +294,7 @@ function buildModelBuffers(model) {
         // Create position and normals buffer
         let positions = [];
         let normals = [];
+        let texCoords = [];
 
         // Loop through the faces associated with each
         // material to retrieve normals and position vertices
@@ -238,10 +303,13 @@ function buildModelBuffers(model) {
                 // Store face vertices in position array
                 positions.push(faces[i].faceVertices[j]);
 
-                // If the face contains normals, store normals
-                // into normals array
+                // Store normals into array
                 if (faces[i].faceNormals.length > 0)
                     normals.push(faces[i].faceNormals[j]);
+
+                // Store textures into array
+                if (faces[i].faceTexCoords && faces[i].faceTexCoords.length > 0)
+                    texCoords.push(faces[i].faceTexCoords[j]);
             }
         }
 
@@ -255,11 +323,17 @@ function buildModelBuffers(model) {
         gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, flatten(normals), gl.STATIC_DRAW);
 
+        // Create textures buffer
+        let texCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(texCoords), gl.STATIC_DRAW);
+
         // Store all data into buffers array
         bufferGroups.push({
             material: material,
             positionBuffer: positionBuffer,
             normalBuffer: normalBuffer,
+            texCoordBuffer: texCoordBuffer,
             vertexCount: positions.length
         });
     }
@@ -282,10 +356,15 @@ function drawModel(model, bufferGroups, matrix) {
         gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(vPosition);
 
-        // // Bind normals buffer to vNormal program variable
+        // Bind normals buffer to vNormal program variable
         gl.bindBuffer(gl.ARRAY_BUFFER, group.normalBuffer);
         gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(vNormal);
+
+        // Bind texture buffers to vTextCoord program variable
+        gl.bindBuffer(gl.ARRAY_BUFFER, group.texCoordBuffer);
+        gl.vertexAttribPointer(vTexCoord, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(vTexCoord);
 
         // Apply correct material
         let diffuse = model.diffuseMap.get(group.material);

@@ -6,13 +6,16 @@
         <script id="vshader" type="x-shader/x-vertex">
             attribute vec4 vPosition;
             attribute vec4 vNormal;
+            attribute vec2 vTexCoord;
             
             uniform mat4 modelMatrix;
             uniform mat4 projMatrix;
             uniform mat4 viewMatrix;
             uniform vec3 spotlightDirection;
-            varying vec3 L, N, V, S;
             uniform vec4 lightPosition;
+
+            varying vec3 L, N, V, S;
+            varying vec2 fTexCoord;
 
             void main() {
                 // convert normal position to calc lightning vector
@@ -29,12 +32,17 @@
                 
                 // view vector
                 V = normalize(-pos);
-                gl_Position = projMatrix * modelViewMatrix * vPosition;
+
+                vec4 worldPosition = modelViewMatrix * vPosition;
+                gl_Position = projMatrix * worldPosition;
+                fTexCoord = vTexCoord;
             }
         </script>
 
         <script id="fshader" type="x-shader/x-fragment">
             precision mediump float;
+
+            uniform sampler2D textureMap;
 
             uniform vec4 vDiffuse;
             uniform vec4 vSpecular;
@@ -50,6 +58,7 @@
             uniform float spotlightCutoff;
 
             varying vec3 L, N, V;
+            varying vec2 fTexCoord;
             
             void main() {
             vec3 Ln = normalize(L);
@@ -68,7 +77,7 @@
             }
 
             // diffuse
-            vec4 diffuse = 2.0 * lightDiffuse * vDiffuse * d * spotlight;
+            vec4 diffuse = lightDiffuse * vDiffuse * d * spotlight;
             
             // specular
             vec4 specular = vec4(0.0);
@@ -77,10 +86,11 @@
                 specular = lightSpecular * vSpecular * pow(max(dot(Vn, R), 0.0), shininess);
             }
 
-            vec4 fColor = diffuse + specular + ambient;
-	        fColor.a = 1.0;
+            vec4 fLighting = vDiffuse + diffuse + specular + ambient;
 
-            gl_FragColor = vDiffuse + diffuse + specular + ambient;
+            vec4 texColor = texture2D(textureMap, fTexCoord);
+
+            gl_FragColor = texColor * fLighting;
         }
         </script>
 
