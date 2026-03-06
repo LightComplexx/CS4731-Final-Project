@@ -70,8 +70,8 @@ function main() {
     gl.uniformMatrix4fv(gl.getUniformLocation(program, 'projMatrix'), false, flatten(projMatrix));
 
     // eye coordinate
-    let lightPosition = vec4(0.0, 0.0, 0.0, 1.0);
-    let lightAmbient  = vec4(0.2, 0.2, 0.2, 1.0);
+    let lightPosition = vec4(2.0, 4.0, 2.0, 1.0);;
+    let lightAmbient  = vec4(0.5, 0.5, 0.5, 1.0);
     let lightDiffuse  = vec4(1.0, 1.0, 1.0, 1.0);
     let lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 
@@ -80,7 +80,7 @@ function main() {
     gl.uniform4fv(gl.getUniformLocation(program, "lightDiffuse"), flatten(lightDiffuse));
     gl.uniform4fv(gl.getUniformLocation(program, "lightSpecular"), flatten(lightSpecular));
 
-    let vAmbient = vec4(0.2, 0.2, 0.2, 1.0);
+    let vAmbient = vec4(0.4, 0.4, 0.4, 1.0);
     let shininess = 40.0;
     gl.uniform4fv(gl.getUniformLocation(program, "vAmbient"), flatten(vAmbient));
     gl.uniform1f(gl.getUniformLocation(program, "shininess"), shininess);
@@ -149,6 +149,13 @@ function render() {
         vec3(0.0, 1.0, 0.0)     // up
     );
     gl.uniformMatrix4fv(gl.getUniformLocation(program, 'viewMatrix'), false, flatten(viewMatrix));
+
+    // spotlight on the ball (following it)
+    let lightPosition = vec4(-0.3, 3.0, ballZ, 1.0);
+    gl.uniform4fv(gl.getUniformLocation(program,"lightPosition"), flatten(lightPosition));
+    let spotlightDirection = vec3(0.0, -1.0, 0.0);
+    gl.uniform3fv(gl.getUniformLocation(program,"spotlightDirection"), flatten(spotlightDirection));
+    gl.uniform1f(gl.getUniformLocation(program, "spotlightCutoff"), 0.85);
 
     // Clear background on each loop
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
