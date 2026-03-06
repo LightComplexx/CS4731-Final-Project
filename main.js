@@ -35,6 +35,22 @@ let ball_buffers;
 let table;
 let table_buffers;
 
+let flagPoleBuffers;
+let flagBuffers;
+
+// For flagpole
+let flagPoleAngle = 0.0;
+let flagPoleSpeed = 1.5;
+
+let flagAngle = 0.0;
+let flagSpeed = 2.0;
+
+let camX = 6.0;
+let camY = 4.0;
+let camZ = 0.0;
+
+let camSpeed = 0.2;
+
 function main() {
     // Retrieve <canvas> element
     canvas = document.getElementById('webgl');
@@ -105,9 +121,42 @@ function main() {
         "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/pong_table.obj",
         "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/pong_table.mtl");
 
+    let flagPoleGeo = buildCylinder(0.05, 1.0, 24);
+    let flagGeo = buildFlag(0.6, 0.4, 0.05);
+
+    flagPoleBuffers = buildSimpleBuffers(flagPoleGeo);
+    flagBuffers = buildSimpleBuffers(flagGeo);
+
+    window.addEventListener("keydown", handleCameraKeys);
+
     // Waits for model buffers to be built
     // before rendering
     waitForModels();
+}
+
+// For input
+function handleCameraKeys(e) {
+    switch (e.key) {
+        case "ArrowUp":
+            camY += camSpeed;
+            break;
+
+        case "ArrowDown":
+            camY -= camSpeed;
+            break;
+
+        case "ArrowLeft":
+            camZ -= camSpeed;
+            break;
+
+        case "ArrowRight":
+            camZ += camSpeed;
+            break;
+    }
+
+    // Clamp bounds
+    camZ = Math.max(-10.0, Math.min(10.0, camZ));
+    camY = Math.max(1.0, Math.min(8.0, camY));
 }
 
 // Builds model buffers then calls render()
@@ -133,6 +182,127 @@ function waitForModels() {
     }
 }
 
+// Cylinder for flagpole
+
+function buildCylinder(radius, height, segments) {
+    let positions = [];
+    let normals = [];
+
+    for (let i = 0; i < segments; i++) {
+        let a = (i / segments) * 2 * Math.PI;
+        let b = ((i + 1) / segments) * 2 * Math.PI;
+
+        let x1 = radius * Math.cos(a);
+        let z1 = radius * Math.sin(a);
+        let x2 = radius * Math.cos(b);
+        let z2 = radius * Math.sin(b);
+
+        // Two triangles per quad
+        let top1 = vec4(x1, height, z1, 1);
+        let top2 = vec4(x2, height, z2, 1);
+        let bot1 = vec4(x1, 0, z1, 1);
+        let bot2 = vec4(x2, 0, z2, 1);
+
+        // Normals (side)
+        let n1 = normalize(vec3(x1, 0, z1));
+        let n2 = normalize(vec3(x2, 0, z2));
+
+        // Triangle 1
+        positions.push(top1, bot1, bot2);
+        normals.push(n1, n1, n2);
+
+        // Triangle 2
+        positions.push(top1, bot2, top2);
+        normals.push(n1, n2, n2);
+    }
+
+    return { positions, normals };
+}
+
+function buildFlag(width, height, thickness) {
+    let w = width / 2;
+    let h = height / 2;
+    let t = thickness / 2;
+
+    // Rectangular prism for flag
+    let verts = [
+        // Front
+        [-w, -h,  t], [ w, -h,  t], [ w,  h,  t],
+        [-w, -h,  t], [ w,  h,  t], [-w,  h,  t],
+
+        // Back
+        [-w, -h, -t], [ w, -h, -t], [ w,  h, -t],
+        [-w, -h, -t], [ w,  h, -t], [-w,  h, -t],
+
+        // Left
+        [-w, -h, -t], [-w, -h,  t], [-w,  h,  t],
+        [-w, -h, -t], [-w,  h,  t], [-w,  h, -t],
+
+        // Right
+        [ w, -h, -t], [ w, -h,  t], [ w,  h,  t],
+        [ w, -h, -t], [ w,  h,  t], [ w,  h, -t],
+
+        // Top
+        [-w,  h, -t], [ w,  h, -t], [ w,  h,  t],
+        [-w,  h, -t], [ w,  h,  t], [-w,  h,  t],
+
+        // Bottom
+        [-w, -h, -t], [ w, -h, -t], [ w, -h,  t],
+        [-w, -h, -t], [ w, -h,  t], [-w, -h,  t],
+    ];
+
+    let positions = [];
+    let normals = [];
+
+    for (let i = 0; i < verts.length; i += 3) {
+        let a = vec4(...verts[i], 1);
+        let b = vec4(...verts[i+1], 1);
+        let c = vec4(...verts[i+2], 1);
+
+        positions.push(a, b, c);
+
+        // Flat normal
+        let n = normalize(cross(subtract(b, a), subtract(c, a)));
+        normals.push(vec4(n, 0), vec4(n, 0), vec4(n, 0));
+    }
+
+    return { positions, normals };
+}
+
+// For building the simple shapes
+function buildSimpleBuffers(geo) {
+    let posBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(geo.positions), gl.STATIC_DRAW);
+
+    let normBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, normBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(geo.normals), gl.STATIC_DRAW);
+
+    return {
+        pos: posBuf,
+        norm: normBuf,
+        count: geo.positions.length
+    };
+}
+
+function drawSimple(buffers, matrix) {
+    gl.uniformMatrix4fv(gl.getUniformLocation(program, "modelMatrix"), false, flatten(matrix));
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.pos);
+    gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vPosition);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.norm);
+    gl.vertexAttribPointer(vNormal, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vNormal);
+
+    gl.uniform4fv(gl.getUniformLocation(program, "vDiffuse"), flatten(vec4(0.8,0.8,0.8,1)));
+    gl.uniform4fv(gl.getUniformLocation(program, "vSpecular"), flatten(vec4(1,1,1,1)));
+
+    gl.drawArrays(gl.TRIANGLES, 0, buffers.count);
+}
+
 function render() {
     // Check for paddle trigger
     padTrigger();
@@ -142,8 +312,8 @@ function render() {
 
     // Create view matrix
     let viewMatrix = lookAt(
-        vec3(6.0, 4.0, 0.0),    // camera position
-        vec3(0.0, 0.0, 0.0),    // look at center
+        vec3(camX, camY, camZ),    // camera position
+        vec3(0.0, 0.0, 0.0),   // always look at center
         vec3(0.0, 1.0, 0.0)     // up
     );
     gl.uniformMatrix4fv(gl.getUniformLocation(program, 'viewMatrix'), false, flatten(viewMatrix));
@@ -172,11 +342,38 @@ function render() {
         )
     );
 
+    // Rorates flagpole
+    flagPoleAngle = Math.sin(Date.now() * 0.001 * flagPoleSpeed) * 10;
+    // Rotates flag
+    flagAngle = Math.sin(Date.now() * 0.002 * flagSpeed) * 25;
+
     // Displays model in viewport
     if (table_buffers) drawModel(table, table_buffers, mat4());
     if (pad_b_buffers) drawModel(pad_b, pad_b_buffers, pad_b_offset);
     if (pad_r_buffers) drawModel(pad_r, pad_r_buffers, pad_r_offset);
     if (ball_buffers) drawModel(ball, ball_buffers, translate(-0.3, 0, ballZ));
+
+    // Flagpole (parent)
+    let poleMatrix = mult(
+        translate(-2.0, 0.5, 0.0),
+        rotateX(flagPoleAngle)
+    );
+
+    drawSimple(flagPoleBuffers, poleMatrix);
+
+    // Flag (child)
+    let flagMatrix = mult(
+        poleMatrix,
+        mult(
+            translate(0.0, 0.8, 0.0),   // move to top of pole
+            mult(
+                rotateY(flagAngle),
+                translate(0.35, 0.0, 0.0)
+            )
+        )
+    );
+
+    drawSimple(flagBuffers, flagMatrix);
 
     // Loops render
     requestAnimationFrame(render);
