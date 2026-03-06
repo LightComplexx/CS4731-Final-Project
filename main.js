@@ -7,9 +7,9 @@ let program;
 
 let vPosition;  // Vertex position attribute
 let vNormal;    // Normals position attribute
+let vTexCoord;  // Texture coordinates attribute
 
-let cameraPos = 0.0;
-
+// Movement variables for paddles and ball
 let ballZ = 0.0;
 let ballSpeed = 0.01;
 
@@ -31,15 +31,292 @@ let pad_r_buffers;
 
 let ball;
 let ball_buffers;
+let ballTexture;
 
 let table;
 let table_buffers;
 
+let flagPoleBuffers;
+let flagBuffers;
+
+// For flagpole
+let flagPoleAngle = 0.0;
+let flagPoleSpeed = 1.5;
+
+let flagAngle = 0.0;
+let flagSpeed = 2.0;
+
+// Camera movement variables
+let camX = 6.0;
+let camY = 4.0;
+let camZ = 0.0;
+let camSpeed = 0.2;
+
 // Skybox variables
-let vTexCoord;
+let vTexCoordSky;
 let skyTexture;
 let skyPositionBuffer;
 let skyTexCoordBuffer;
+
+function main() {
+    // Retrieve <canvas> element
+    canvas = document.getElementById('webgl');
+
+    // Get the rendering context for WebGL
+    gl = WebGLUtils.setupWebGL(canvas, undefined);
+
+    //Check that the return value is not null.
+    if (!gl) {
+        console.log('Failed to get the rendering context for WebGL');
+        return;
+    }
+
+    // Initialize shaders
+    program = initShaders(gl, "vshader", "fshader");
+    gl.useProgram(program);
+
+    createSkyBackground();
+    let image = new Image();
+    image.crossOrigin = "";
+    image.src = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/July_night_sky_%2835972569256%29.jpg/960px-July_night_sky_%2835972569256%29.jpg";
+    image.onload = function() {
+        configureTexture(image);
+    };
+
+    // Set viewport
+    gl.viewport(0, 0, canvas.width, canvas.height);
+
+    // Set clear color
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+
+    // Enable depth testing
+    gl.enable(gl.DEPTH_TEST);
+
+    // Get vertex attribute locations from shader
+    vPosition = gl.getAttribLocation(program, "vPosition");
+    vNormal = gl.getAttribLocation(program, "vNormal");
+    vTexCoord = gl.getAttribLocation(program, "vTexCoord");
+    vTexCoordSky = gl.getAttribLocation(program, "vTexCoordSky");
+
+    // Create project matrix
+    let projMatrix = perspective(40, 1, 0.1, 200);
+    gl.uniformMatrix4fv(gl.getUniformLocation(program, 'projMatrix'), false, flatten(projMatrix));
+
+    // eye coordinate
+    let lightPosition = vec4(2.0, 4.0, 2.0, 1.0);
+    let lightAmbient  = vec4(0.5, 0.5, 0.5, 1.0);
+    let lightDiffuse  = vec4(1.0, 1.0, 1.0, 1.0);
+    let lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
+
+    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(lightPosition));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightAmbient"), flatten(lightAmbient));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightDiffuse"), flatten(lightDiffuse));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightSpecular"), flatten(lightSpecular));
+
+    let vAmbient = vec4(0.4, 0.4, 0.4, 1.0);
+    let shininess = 40.0;
+    gl.uniform4fv(gl.getUniformLocation(program, "vAmbient"), flatten(vAmbient));
+    gl.uniform1f(gl.getUniformLocation(program, "shininess"), shininess);
+
+    // Get blue paddle
+    pad_b = new Model(
+        "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/paddle_blue.obj",
+        "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/paddle_blue.mtl");
+
+    // Get red paddle
+    pad_r = new Model(
+        "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/paddle_red.obj",
+        "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/paddle_red.mtl");
+
+    // Get ball
+    ball = new Model(
+        "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/ball.obj",
+        "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/ball.mtl");
+
+    // Get table
+    table = new Model(
+        "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/pong_table.obj",
+        "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/pong_table.mtl");
+
+    let flagPoleGeo = buildCylinder(0.05, 1.0, 24);
+    let flagGeo = buildFlag(0.6, 0.4, 0.05);
+
+    flagPoleBuffers = buildSimpleBuffers(flagPoleGeo);
+    flagBuffers = buildSimpleBuffers(flagGeo);
+
+    window.addEventListener("keydown", handleCameraKeys);
+
+    // Create ball texture
+    ballTexture = createBallGradientTexture();
+
+    // Waits for model buffers to be built
+    // before rendering
+    waitForModels();
+}
+
+// Builds model buffers then calls render()
+function waitForModels() {
+    if (!table_buffers && table.objParsed && table.mtlParsed)
+        table_buffers = buildModelBuffers(table);
+
+    if (!pad_b_buffers && pad_b.objParsed && pad_b.mtlParsed)
+        pad_b_buffers = buildModelBuffers(pad_b);
+
+    if (!pad_r_buffers && pad_r.objParsed && pad_r.mtlParsed)
+        pad_r_buffers = buildModelBuffers(pad_r);
+
+    if (!ball_buffers && ball.objParsed && ball.mtlParsed)
+        ball_buffers = buildModelBuffers(ball);
+
+    if(table_buffers && pad_r_buffers && pad_b_buffers && ball_buffers) {
+        render();
+    }
+    else {
+        // Loop back if all buffers aren't ready
+        requestAnimationFrame(waitForModels);
+    }
+}
+
+function render() {
+    // Check for paddle trigger
+    padTrigger();
+
+    // Calculate object movements
+    calcObjectMovements();
+
+    // Create camera view matrix
+    let viewMatrix = lookAt(
+        vec3(camX, camY, camZ),    // camera position
+        vec3(0.0, 0.0, 0.0),   // always look at center
+        vec3(0.0, 1.0, 0.0)     // up
+    );
+    gl.uniformMatrix4fv(gl.getUniformLocation(program, 'viewMatrix'), false, flatten(viewMatrix));
+
+    // spotlight on the ball (following it)
+    let lightPosition = vec4(-2.3, 5.0, ballZ, 1.0);
+    gl.uniform4fv(gl.getUniformLocation(program,"lightPosition"), flatten(lightPosition));
+    let spotlightDirection = vec3(0.0, -1.0, 0.0);
+    gl.uniform3fv(gl.getUniformLocation(program,"spotlightDirection"), flatten(spotlightDirection));
+    gl.uniform1f(gl.getUniformLocation(program, "spotlightCutoff"), 0.85);
+
+
+    // Clear background on each loop
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    drawSky();
+
+    // Rotates blue paddle
+    let pad_b_offset = mult(
+        translate(0.0, 0.0, -2.0),
+        mult(
+            translate(0.0, 3.25, bPadZ),
+            rotateX(90.0)
+        )
+    );
+
+    // Rotates red paddle
+    let pad_r_offset = mult(
+        translate(0.0, 0.0, -2.0),
+        mult(
+            translate(0.0, 2.6, rPadZ),
+            mult(
+                rotateX(-90.0),
+                translate(0.0, 0.0, 0.0)
+            )
+        )
+    );
+
+    // Rorates flagpole
+    flagPoleAngle = Math.sin(Date.now() * 0.001 * flagPoleSpeed) * 10;
+    // Rotates flag
+    flagAngle = Math.sin(Date.now() * 0.002 * flagSpeed) * 25;
+
+    // Displays model in viewport
+    gl.uniform1i(gl.getUniformLocation(program, "useTexture"), 0);
+    if (table_buffers) drawModel(table, table_buffers, mat4());
+    if (pad_b_buffers) drawModel(pad_b, pad_b_buffers, pad_b_offset);
+    if (pad_r_buffers) drawModel(pad_r, pad_r_buffers, pad_r_offset);
+
+    // Add gradient texture to ball before drawing
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, ballTexture);
+    gl.uniform1i(gl.getUniformLocation(program, "useTexture"), 1);
+    if (ball_buffers) drawModel(ball, ball_buffers, translate(-0.3, 0, ballZ));
+
+    // Flagpole (parent)
+    let poleMatrix = mult(
+        translate(-2.0, 0.5, 0.0),
+        rotateX(flagPoleAngle)
+    );
+
+    drawSimple(flagPoleBuffers, poleMatrix);
+
+    // Flag (child)
+    let flagMatrix = mult(
+        poleMatrix,
+        mult(
+            translate(0.0, 0.8, 0.0),   // move to top of pole
+            mult(
+                rotateY(flagAngle),
+                translate(0.35, 0.0, 0.0)
+            )
+        )
+    );
+
+    drawSimple(flagBuffers, flagMatrix);
+
+    // Loops render
+    requestAnimationFrame(render);
+}
+
+function createBallGradientTexture() {
+    const size = 128;
+    const data = new Uint8Array(size * size * 4);
+
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+
+            let dx = (x - size/2) / (size/2);
+            let dy = (y - size/2) / (size/2);
+
+            let dist = Math.sqrt(dx*dx + dy*dy);
+
+            // Clamp distance
+            dist = Math.min(dist, 1.0);
+
+            // Gradient value
+            let brightness = 1.0 - dist;
+
+            let color = brightness * 255;
+
+            let index = (y * size + x) * 4;
+
+            data[index] = color;      // R
+            data[index+1] = color;    // G
+            data[index+2] = color;    // B
+            data[index+3] = 255;      // A
+        }
+    }
+
+    let texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        size,
+        size,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        data
+    );
+
+    gl.generateMipmap(gl.TEXTURE_2D);
+
+    return texture;
+}
 
 function configureTexture(image) {
     skyTexture = gl.createTexture();
@@ -85,114 +362,152 @@ function createSkyBackground() {
     gl.bufferData(gl.ARRAY_BUFFER, flatten(skyTexCoords), gl.STATIC_DRAW);
 }
 
-function main() {
-    // Retrieve <canvas> element
-    canvas = document.getElementById('webgl');
 
-    // Get the rendering context for WebGL
-    gl = WebGLUtils.setupWebGL(canvas, undefined);
+// For input
+function handleCameraKeys(e) {
+    switch (e.key) {
+        case "ArrowUp":
+            camY += camSpeed;
+            break;
 
-    //Check that the return value is not null.
-    if (!gl) {
-        console.log('Failed to get the rendering context for WebGL');
-        return;
+        case "ArrowDown":
+            camY -= camSpeed;
+            break;
+
+        case "ArrowLeft":
+            camZ += camSpeed;
+            break;
+
+        case "ArrowRight":
+            camZ -= camSpeed;
+            break;
     }
 
-    // Initialize shaders
-    program = initShaders(gl, "vshader", "fshader");
-    gl.useProgram(program);
-
-    vTexCoord = gl.getAttribLocation(program, "vTexCoord");
-
-    createSkyBackground();
-    let image = new Image();
-    image.crossOrigin = "";
-    image.src = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/July_night_sky_%2835972569256%29.jpg/960px-July_night_sky_%2835972569256%29.jpg";  
-    image.onload = function() {
-        configureTexture(image);
-    };
-
-    gl.uniform1i(gl.getUniformLocation(program, "skyMap"), 0);
-
-    // Set viewport
-    gl.viewport(0, 0, canvas.width, canvas.height);
-
-    // Set clear color
-    gl.clearColor(0.0, 0.0, 0.0, 1.0);
-
-    // Enable depth testing
-    gl.enable(gl.DEPTH_TEST);
-
-    // Get vertex attribute locations from shader
-    vPosition = gl.getAttribLocation(program, "vPosition");
-    vNormal = gl.getAttribLocation(program, "vNormal");
-
-    // Create project matrix
-    let projMatrix = perspective(40, 1, 0.1, 200);
-    gl.uniformMatrix4fv(gl.getUniformLocation(program, 'projMatrix'), false, flatten(projMatrix));
-
-    // eye coordinate
-    let lightPosition = vec4(2.0, 4.0, 2.0, 1.0);;
-    let lightAmbient  = vec4(0.5, 0.5, 0.5, 1.0);
-    let lightDiffuse  = vec4(1.0, 1.0, 1.0, 1.0);
-    let lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
-
-    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(lightPosition));
-    gl.uniform4fv(gl.getUniformLocation(program, "lightAmbient"), flatten(lightAmbient));
-    gl.uniform4fv(gl.getUniformLocation(program, "lightDiffuse"), flatten(lightDiffuse));
-    gl.uniform4fv(gl.getUniformLocation(program, "lightSpecular"), flatten(lightSpecular));
-
-    let vAmbient = vec4(0.4, 0.4, 0.4, 1.0);
-    let shininess = 40.0;
-    gl.uniform4fv(gl.getUniformLocation(program, "vAmbient"), flatten(vAmbient));
-    gl.uniform1f(gl.getUniformLocation(program, "shininess"), shininess);
-
-    // Get blue paddle
-    pad_b = new Model(
-        "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/paddle_blue.obj",
-        "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/paddle_blue.mtl");
-
-    // Get red paddle
-    pad_r = new Model(
-        "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/paddle_red.obj",
-        "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/paddle_red.mtl");
-
-    // Get ball
-    ball = new Model(
-        "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/ball.obj",
-        "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/ball.mtl");
-
-    // Get table
-    table = new Model(
-        "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/pong_table.obj",
-        "https://raw.githubusercontent.com/LightComplexx/CS4731-Final-Project/refs/heads/main/obj/pong_table.mtl");
-
-    // Waits for model buffers to be built
-    // before rendering
-    waitForModels();
+    // Clamp bounds
+    camZ = Math.max(-10.0, Math.min(10.0, camZ));
+    camY = Math.max(1.0, Math.min(8.0, camY));
 }
 
-// Builds model buffers then calls render()
-function waitForModels() {
-    if (!table_buffers && table.objParsed && table.mtlParsed)
-        table_buffers = buildModelBuffers(table);
+// Cylinder for flagpole
+function buildCylinder(radius, height, segments) {
+    let positions = [];
+    let normals = [];
 
-    if (!pad_b_buffers && pad_b.objParsed && pad_b.mtlParsed)
-        pad_b_buffers = buildModelBuffers(pad_b);
+    for (let i = 0; i < segments; i++) {
+        let a = (i / segments) * 2 * Math.PI;
+        let b = ((i + 1) / segments) * 2 * Math.PI;
 
-    if (!pad_r_buffers && pad_r.objParsed && pad_r.mtlParsed)
-        pad_r_buffers = buildModelBuffers(pad_r);
+        let x1 = radius * Math.cos(a);
+        let z1 = radius * Math.sin(a);
+        let x2 = radius * Math.cos(b);
+        let z2 = radius * Math.sin(b);
 
-    if (!ball_buffers && ball.objParsed && ball.mtlParsed)
-        ball_buffers = buildModelBuffers(ball);
+        // Two triangles per quad
+        let top1 = vec4(x1, height, z1, 1);
+        let top2 = vec4(x2, height, z2, 1);
+        let bot1 = vec4(x1, 0, z1, 1);
+        let bot2 = vec4(x2, 0, z2, 1);
 
-    if(table_buffers && pad_r_buffers && pad_b_buffers && ball_buffers) {
-        render();
+        // Normals (side)
+        let n1 = normalize(vec3(x1, 0, z1));
+        let n2 = normalize(vec3(x2, 0, z2));
+
+        // Triangle 1
+        positions.push(top1, bot1, bot2);
+        normals.push(n1, n1, n2);
+
+        // Triangle 2
+        positions.push(top1, bot2, top2);
+        normals.push(n1, n2, n2);
     }
-    else {
-        // Loop back if all buffers aren't ready
-        requestAnimationFrame(waitForModels);
+
+    return { positions, normals };
+}
+
+// Flag for flagpole
+function buildFlag(width, height, thickness) {
+    let w = width / 2;
+    let h = height / 2;
+    let t = thickness / 2;
+
+    // Rectangular prism for flag
+    let verts = [
+        // Front
+        [-w, -h,  t], [ w, -h,  t], [ w,  h,  t],
+        [-w, -h,  t], [ w,  h,  t], [-w,  h,  t],
+
+        // Back
+        [-w, -h, -t], [ w, -h, -t], [ w,  h, -t],
+        [-w, -h, -t], [ w,  h, -t], [-w,  h, -t],
+
+        // Left
+        [-w, -h, -t], [-w, -h,  t], [-w,  h,  t],
+        [-w, -h, -t], [-w,  h,  t], [-w,  h, -t],
+
+        // Right
+        [ w, -h, -t], [ w, -h,  t], [ w,  h,  t],
+        [ w, -h, -t], [ w,  h,  t], [ w,  h, -t],
+
+        // Top
+        [-w,  h, -t], [ w,  h, -t], [ w,  h,  t],
+        [-w,  h, -t], [ w,  h,  t], [-w,  h,  t],
+
+        // Bottom
+        [-w, -h, -t], [ w, -h, -t], [ w, -h,  t],
+        [-w, -h, -t], [ w, -h,  t], [-w, -h,  t],
+    ];
+
+    let positions = [];
+    let normals = [];
+
+    for (let i = 0; i < verts.length; i += 3) {
+        let a = vec4(...verts[i], 1);
+        let b = vec4(...verts[i+1], 1);
+        let c = vec4(...verts[i+2], 1);
+
+        positions.push(a, b, c);
+
+        // Flat normal
+        let n = normalize(cross(subtract(b, a), subtract(c, a)));
+        normals.push(vec4(n, 0), vec4(n, 0), vec4(n, 0));
     }
+
+    return { positions, normals };
+}
+
+// For building the simple shapes
+function buildSimpleBuffers(geo) {
+    let posBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(geo.positions), gl.STATIC_DRAW);
+
+    let normBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, normBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(geo.normals), gl.STATIC_DRAW);
+
+    return {
+        pos: posBuf,
+        norm: normBuf,
+        count: geo.positions.length
+    };
+}
+
+function drawSimple(buffers, matrix) {
+    gl.uniform1i(gl.getUniformLocation(program, "useTexture"), 0);
+    gl.uniformMatrix4fv(gl.getUniformLocation(program, "modelMatrix"), false, flatten(matrix));
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.pos);
+    gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vPosition);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.norm);
+    gl.vertexAttribPointer(vNormal, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vNormal);
+
+    gl.uniform4fv(gl.getUniformLocation(program, "vDiffuse"), flatten(vec4(0.8,0.8,0.8,1)));
+    gl.uniform4fv(gl.getUniformLocation(program, "vSpecular"), flatten(vec4(1,1,1,1)));
+
+    gl.drawArrays(gl.TRIANGLES, 0, buffers.count);
 }
 
 function drawSky() {
@@ -204,8 +519,8 @@ function drawSky() {
     gl.enableVertexAttribArray(vPosition);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, skyTexCoordBuffer);
-    gl.vertexAttribPointer(vTexCoord, 2, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(vTexCoord);
+    gl.vertexAttribPointer(vTexCoordSky, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vTexCoordSky);
 
     let skyMatrix = mat4();
     gl.uniformMatrix4fv(gl.getUniformLocation(program, "modelMatrix"), false, flatten(skyMatrix));
@@ -216,64 +531,8 @@ function drawSky() {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.enable(gl.DEPTH_TEST);
     gl.uniform1i(gl.getUniformLocation(program, "isSkybox"), 0);
-}
 
-function render() {
-    // Check for paddle trigger
-    padTrigger();
-
-    // Calculate object movements
-    calcObjectMovements();
-
-    // Create view matrix
-    let viewMatrix = lookAt(
-        vec3(6.0, 4.0, 0.0),    // camera position
-        vec3(0.0, 0.0, 0.0),    // look at center
-        vec3(0.0, 1.0, 0.0)     // up
-    );
-    gl.uniformMatrix4fv(gl.getUniformLocation(program, 'viewMatrix'), false, flatten(viewMatrix));
-
-    // spotlight on the ball (following it)
-    let lightPosition = vec4(-0.3, 3.0, ballZ, 1.0);
-    gl.uniform4fv(gl.getUniformLocation(program,"lightPosition"), flatten(lightPosition));
-    let spotlightDirection = vec3(0.0, -1.0, 0.0);
-    gl.uniform3fv(gl.getUniformLocation(program,"spotlightDirection"), flatten(spotlightDirection));
-    gl.uniform1f(gl.getUniformLocation(program, "spotlightCutoff"), 0.85);
-
-    // Clear background on each loop
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-    drawSky();
-
-    // Rotates blue paddle
-    let pad_b_offset = mult(
-        translate(0.0, 0.0, -2.0),
-        mult(
-            translate(0.0, 3.25, bPadZ),
-            rotateX(90.0)
-        )
-    );
-
-    // Rotates red paddle
-    let pad_r_offset = mult(
-        translate(0.0, 0.0, -2.0),
-        mult(
-            translate(0.0, 2.6, rPadZ),
-            mult(
-                rotateX(-90.0),
-                translate(0.0, 0.0, 0.0)
-            )
-        )
-    );
-
-    // Displays model in viewport
-    if (table_buffers) drawModel(table, table_buffers, mat4());
-    if (pad_b_buffers) drawModel(pad_b, pad_b_buffers, pad_b_offset);
-    if (pad_r_buffers) drawModel(pad_r, pad_r_buffers, pad_r_offset);
-    if (ball_buffers) drawModel(ball, ball_buffers, translate(-0.3, 0, ballZ));
-
-    // Loops render
-    requestAnimationFrame(render);
+    gl.disableVertexAttribArray(vTexCoordSky);
 }
 
 /**
@@ -315,6 +574,7 @@ function buildModelBuffers(model) {
         // Create position and normals buffer
         let positions = [];
         let normals = [];
+        let texCoords = [];
 
         // Loop through the faces associated with each
         // material to retrieve normals and position vertices
@@ -323,10 +583,13 @@ function buildModelBuffers(model) {
                 // Store face vertices in position array
                 positions.push(faces[i].faceVertices[j]);
 
-                // If the face contains normals, store normals
-                // into normals array
+                // Store normals into array
                 if (faces[i].faceNormals.length > 0)
                     normals.push(faces[i].faceNormals[j]);
+
+                // Store textures into array
+                if (faces[i].faceTexCoords && faces[i].faceTexCoords.length > 0)
+                    texCoords.push(faces[i].faceTexCoords[j]);
             }
         }
 
@@ -340,11 +603,17 @@ function buildModelBuffers(model) {
         gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, flatten(normals), gl.STATIC_DRAW);
 
+        // Create textures buffer
+        let texCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(texCoords), gl.STATIC_DRAW);
+
         // Store all data into buffers array
         bufferGroups.push({
             material: material,
             positionBuffer: positionBuffer,
             normalBuffer: normalBuffer,
+            texCoordBuffer: texCoordBuffer,
             vertexCount: positions.length
         });
     }
@@ -367,10 +636,15 @@ function drawModel(model, bufferGroups, matrix) {
         gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(vPosition);
 
-        // // Bind normals buffer to vNormal program variable
+        // Bind normals buffer to vNormal program variable
         gl.bindBuffer(gl.ARRAY_BUFFER, group.normalBuffer);
         gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(vNormal);
+
+        // Bind texture buffers to vTextCoord program variable
+        gl.bindBuffer(gl.ARRAY_BUFFER, group.texCoordBuffer);
+        gl.vertexAttribPointer(vTexCoord, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(vTexCoord);
 
         // Apply correct material
         let diffuse = model.diffuseMap.get(group.material);
@@ -435,7 +709,7 @@ function calcObjectMovements(){
     // Move red paddle if triggered
     if(move_rPad){
         rPadZ -= rPadSpeed;
-        if(rPadZ < 1.8 && rPadSpeed > 0.0){
+        if(rPadZ < 1.82 && rPadSpeed > 0.0){
             rPadSpeed *= -1.0;
         }
         if(rPadZ >= 2.0 && rPadSpeed < 0.0){
@@ -447,8 +721,7 @@ function calcObjectMovements(){
     // Move blue paddle if triggered
     if(move_bPad){
         bPadZ += bPadSpeed;
-        console.log(bPadZ);
-        if(bPadZ > 2.2 && bPadSpeed > 0.0){
+        if(bPadZ > 2.17 && bPadSpeed > 0.0){
             bPadSpeed *= -1.0;
         }
         if(bPadZ <= 2.0 && bPadSpeed < 0.0){

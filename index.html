@@ -6,21 +6,24 @@
         <script id="vshader" type="x-shader/x-vertex">
             attribute vec4 vPosition;
             attribute vec4 vNormal;
-            
+            attribute vec2 vTexCoord;
+            attribute vec2 vTexCoordSky;
+
             uniform mat4 modelMatrix;
             uniform mat4 projMatrix;
             uniform mat4 viewMatrix;
             uniform vec3 spotlightDirection;
-            varying vec3 L, N, V, S;
             uniform vec4 lightPosition;
 
-            attribute vec2 vTexCoord;
-            uniform bool isSkybox;
+            varying vec3 L, N, V;
             varying vec2 fTexCoord;
+            varying vec2 fTexCoordSky;
+
+            uniform bool isSkybox;
 
             void main() {
                 if (isSkybox) {
-                    fTexCoord = vTexCoord;
+                    fTexCoordSky = vTexCoordSky;
                     gl_Position = projMatrix * viewMatrix * modelMatrix * vPosition;
                 // convert normal position to calc lightning vector
                 } else {
@@ -38,12 +41,15 @@
                 V = normalize(-pos);
 
                 gl_Position = projMatrix * modelViewMatrix * vPosition;
+                fTexCoord = vTexCoord;
                 }
             }
         </script>
 
         <script id="fshader" type="x-shader/x-fragment">
             precision mediump float;
+
+            uniform sampler2D textureMap;
 
             uniform vec4 vDiffuse;
             uniform vec4 vSpecular;
@@ -55,18 +61,21 @@
 
             uniform float shininess;
 
-            uniform vec3 spotlightDirection; 
+            uniform vec3 spotlightDirection;
             uniform float spotlightCutoff;
 
-            varying vec2 fTexCoord;
+            varying vec2 fTexCoordSky;
             uniform sampler2D skyMap;
             uniform bool isSkybox;
 
             varying vec3 L, N, V;
+            varying vec2 fTexCoord;
+            uniform bool useTexture;
             
             void main() {
                 if (isSkybox) {
-                    gl_FragColor = texture2D(skyMap, fTexCoord);
+                    gl_FragColor = texture2D(skyMap, fTexCoordSky);
+                    return;
                 } else {
                     vec3 Ln = normalize(L);
                     vec3 Nn = normalize(N);
@@ -76,7 +85,7 @@
                     float spotlight = max(dot(normalize(-Ln), normalize(spotlightDirection)), 0.0);
 
                     // ambient
-                    vec4 ambient = lightAmbient * vAmbient; 
+                    vec4 ambient = lightAmbient * vAmbient;
 
                     if (spotlight < spotlightCutoff) {
                         gl_FragColor = ambient;
@@ -84,7 +93,7 @@
                     }
 
                     // diffuse
-                    vec4 diffuse = 2.0 * lightDiffuse * vDiffuse * d * spotlight;
+                    vec4 diffuse = lightDiffuse * vDiffuse * d * spotlight;
             
                     // specular
                     vec4 specular = vec4(0.0);
@@ -93,9 +102,17 @@
                         specular = lightSpecular * vSpecular * pow(max(dot(Vn, R), 0.0), shininess);
                     }
 
-                    vec4 fColor = diffuse + specular + ambient;
+                    vec4 fColor = vDiffuse + diffuse + specular + ambient;
 	                fColor.a = 1.0;
-                    gl_FragColor = vDiffuse + diffuse + specular + ambient;
+
+	                vec4 baseColor = fColor;
+
+                    if (useTexture) {
+	                    vec4 texColor = texture2D(textureMap, fTexCoord);
+	                    baseColor *= texColor;
+                    }
+
+                    gl_FragColor = baseColor;
                 }
             }
         </script>
