@@ -146,11 +146,11 @@ function handleCameraKeys(e) {
             break;
 
         case "ArrowLeft":
-            camZ -= camSpeed;
+            camZ += camSpeed;
             break;
 
         case "ArrowRight":
-            camZ += camSpeed;
+            camZ -= camSpeed;
             break;
     }
 
