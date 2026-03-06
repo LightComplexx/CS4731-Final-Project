@@ -108,8 +108,8 @@
 	                vec4 baseColor = fColor;
 
                     if (useTexture) {
-	                    vec4 texColor = texture2D(textureMap, fTexCoord);
-	                    baseColor *= texColor;
+	                    vec4 texColor = texture2D(textureMap, fTexCoord) + vDiffuse;
+	                    baseColor = texColor;
                     }
 
                     gl_FragColor = baseColor;

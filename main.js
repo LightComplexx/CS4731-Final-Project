@@ -213,7 +213,7 @@ function render() {
     gl.uniformMatrix4fv(gl.getUniformLocation(program, 'viewMatrix'), false, flatten(viewMatrix));
 
     // spotlight on the ball (following it)
-    let lightPosition = vec4(-2.3, 5.0, ballZ, 1.0);
+    let lightPosition = vec4(-0.3, 5.0, ballZ, 1.0);
     gl.uniform4fv(gl.getUniformLocation(program,"lightPosition"), flatten(lightPosition));
     let spotlightDirection = vec3(0.0, -1.0, 0.0);
     gl.uniform3fv(gl.getUniformLocation(program,"spotlightDirection"), flatten(spotlightDirection));
