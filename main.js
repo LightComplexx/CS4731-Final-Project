@@ -223,6 +223,7 @@ function render() {
     // Clear background on each loop
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+    // Draw skybox
     drawSky();
 
     // Rotates blue paddle
@@ -246,11 +247,12 @@ function render() {
         )
     );
 
-    // Rorates flagpole
+    // Rotates flagpole
     flagPoleAngle = Math.sin(Date.now() * 0.001 * flagPoleSpeed) * 10;
     // Rotates flag
     flagAngle = Math.sin(Date.now() * 0.002 * flagSpeed) * 25;
 
+    // Original ball translate
     let ballT = translate(-0.3, 0, ballZ);
 
     // computer rect
@@ -271,7 +273,6 @@ function render() {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, ballTexture);
     gl.uniform1i(gl.getUniformLocation(program, "useTexture"), 1);
-    //if (ball_buffers) drawModel(ball, ball_buffers, translate(-0.3, 0, ballZ));
     if (ball_buffers) drawModel(ball, ball_buffers, ballT);
 
     // draw mirror surface and need blend in order for us to see the ball
@@ -284,17 +285,17 @@ function render() {
     gl.enable(gl.SCISSOR_TEST);
     gl.scissor(mirrorSX, mirrorSY, mirrorSW, mirrorSH);
     gl.clear(gl.DEPTH_BUFFER_BIT);
-    // diasable depth (reflection always on the top of themirror)
+    // disable depth (reflection always on the top of the mirror)
     gl.disable(gl.DEPTH_TEST);
 
-    // have bright ambient and changr the light for reflection
+    // have bright ambient and change the light for reflection
     gl.uniform4fv(gl.getUniformLocation(program, "vAmbient"), flatten(vec4(1.0, 1.0, 1.0, 1.0)));
     gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(vec4(-1.148, 3.0, ballZ, 1.0)));
 
     let reflectT = mult(translate(REFLECT_DX, 0, 0), ballT);
     if (ball_buffers) drawModel(ball, ball_buffers, reflectT);
 
-    // change back lighnting
+    // change back lighting
     gl.enable(gl.DEPTH_TEST);
     gl.uniform4fv(gl.getUniformLocation(program, "vAmbient"), flatten(vec4(0.4, 0.4, 0.4, 1.0)));
     gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(vec4(2.0, 4.0, 2.0, 1.0)));
@@ -620,11 +621,11 @@ function drawMirrorSurface() {
     gl.enableVertexAttribArray(vPosition);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, mirrorBuffers.normalBuffer);
-    gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(vNormal, 4, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vNormal);
 
-    gl.uniform4fv(gl.getUniformLocation(program, "vDiffuse"), new Float32Array([0.7, 0.88, 1.0, 0.5]));
-    gl.uniform4fv(gl.getUniformLocation(program, "vSpecular"), new Float32Array([1.0, 1.0, 1.0, 1.0]));
+    gl.uniform4fv(gl.getUniformLocation(program, "vDiffuse"), flatten(vec4(0.7, 0.88, 1.0, 0.5)));
+    gl.uniform4fv(gl.getUniformLocation(program, "vSpecular"), flatten(vec4(1.0, 1.0, 1.0, 1.0)));
     gl.uniformMatrix4fv(gl.getUniformLocation(program, "modelMatrix"), false, flatten(mat4()));
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
