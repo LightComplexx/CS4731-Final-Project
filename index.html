@@ -10,14 +10,21 @@
             uniform mat4 modelMatrix;
             uniform mat4 projMatrix;
             uniform mat4 viewMatrix;
-
-            varying vec3 L, N, V;
+            uniform vec3 spotlightDirection;
+            varying vec3 L, N, V, S;
             uniform vec4 lightPosition;
 
-            void main() {
-                // convert normal position to calc lightning vector
-                mat4 modelViewMatrix = viewMatrix * modelMatrix;
+            attribute vec2 vTexCoord;
+            uniform bool isSkybox;
+            varying vec2 fTexCoord;
 
+            void main() {
+                if (isSkybox) {
+                    fTexCoord = vTexCoord;
+                    gl_Position = projMatrix * viewMatrix * modelMatrix * vPosition;
+                // convert normal position to calc lightning vector
+                } else {
+                    mat4 modelViewMatrix = viewMatrix * modelMatrix;
                 vec3 pos = (modelViewMatrix * vPosition).xyz;
                 vec3 lightPositionEye = (viewMatrix * lightPosition).xyz;
 
@@ -29,7 +36,9 @@
                 
                 // view vector
                 V = normalize(-pos);
+
                 gl_Position = projMatrix * modelViewMatrix * vPosition;
+                }
             }
         </script>
 
@@ -46,33 +55,49 @@
 
             uniform float shininess;
 
+            uniform vec3 spotlightDirection; 
+            uniform float spotlightCutoff;
+
+            varying vec2 fTexCoord;
+            uniform sampler2D skyMap;
+            uniform bool isSkybox;
+
             varying vec3 L, N, V;
             
             void main() {
-            vec3 Ln = normalize(L);
-            vec3 Nn = normalize(N);
-            vec3 Vn = normalize(V);
+                if (isSkybox) {
+                    gl_FragColor = texture2D(skyMap, fTexCoord);
+                } else {
+                    vec3 Ln = normalize(L);
+                    vec3 Nn = normalize(N);
+                    vec3 Vn = normalize(V);
 
-            float d = max(dot(Ln, Nn), 0.0);
+                    float d = max(dot(Ln, Nn), 0.0);
+                    float spotlight = max(dot(normalize(-Ln), normalize(spotlightDirection)), 0.0);
 
-            // diffuse
-            vec4 diffuse = 2.0 * lightDiffuse * vDiffuse * d;
+                    // ambient
+                    vec4 ambient = lightAmbient * vAmbient; 
+
+                    if (spotlight < spotlightCutoff) {
+                        gl_FragColor = ambient;
+                        return;
+                    }
+
+                    // diffuse
+                    vec4 diffuse = 2.0 * lightDiffuse * vDiffuse * d * spotlight;
             
-            // specular
-            vec4 specular = vec4(0.0);
-            if (d > 0.0) {
-                vec3 R = reflect(-Ln, Nn);
-                specular = lightSpecular * vSpecular * pow(max(dot(Vn, R), 0.0), shininess);
+                    // specular
+                    vec4 specular = vec4(0.0);
+                    if (d > 0.0) {
+                        vec3 R = reflect(-Ln, Nn);
+                        specular = lightSpecular * vSpecular * pow(max(dot(Vn, R), 0.0), shininess);
+                    }
+
+                    vec4 fColor = diffuse + specular + ambient;
+	                fColor.a = 1.0;
+                    gl_FragColor = vDiffuse + diffuse + specular + ambient;
+                }
             }
-
-            // ambient
-            vec4 ambient = lightAmbient * vAmbient;
-
-            vec4 fColor = diffuse + specular + ambient;
-	        fColor.a = 1.0;
-
-            gl_FragColor = vDiffuse + diffuse + specular + ambient;
-        }
         </script>
 
         <script type="text/javascript" src="lib/webgl-utils.js"></script>
