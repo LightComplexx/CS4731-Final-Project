@@ -326,6 +326,31 @@ function render() {
     requestAnimationFrame(render);
 }
 
+// For input
+function handleCameraKeys(e) {
+    switch (e.key) {
+        case "ArrowUp":
+            camY += camSpeed;
+            break;
+
+        case "ArrowDown":
+            camY -= camSpeed;
+            break;
+
+        case "ArrowLeft":
+            camZ += camSpeed;
+            break;
+
+        case "ArrowRight":
+            camZ -= camSpeed;
+            break;
+    }
+
+    // Clamp bounds
+    camZ = Math.max(-10.0, Math.min(10.0, camZ));
+    camY = Math.max(1.0, Math.min(8.0, camY));
+}
+
 function createBallGradientTexture() {
     const size = 128;
     const data = new Uint8Array(size * size * 4);
@@ -417,32 +442,6 @@ function createSkyBackground() {
     skyTexCoordBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, skyTexCoordBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(skyTexCoords), gl.STATIC_DRAW);
-}
-
-
-// For input
-function handleCameraKeys(e) {
-    switch (e.key) {
-        case "ArrowUp":
-            camY += camSpeed;
-            break;
-
-        case "ArrowDown":
-            camY -= camSpeed;
-            break;
-
-        case "ArrowLeft":
-            camZ += camSpeed;
-            break;
-
-        case "ArrowRight":
-            camZ -= camSpeed;
-            break;
-    }
-
-    // Clamp bounds
-    camZ = Math.max(-10.0, Math.min(10.0, camZ));
-    camY = Math.max(1.0, Math.min(8.0, camY));
 }
 
 // Cylinder for flagpole
