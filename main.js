@@ -58,6 +58,25 @@ let skyTexture;
 let skyPositionBuffer;
 let skyTexCoordBuffer;
 
+// set mirrorbuffers
+let mirrorBuffers = null;
+
+// mirror constants
+
+// mirror x
+const MX = -1.0;
+
+// mirror z
+const MZ_MIN = -1.0;
+const MZ_MAX = 1.0;
+
+// mirror y
+const MY_BOT = 1.366;
+const MY_TOP = 2.166;
+
+// delta x
+const REFLECT_DX = -1.296;
+
 function main() {
     // Retrieve <canvas> element
     canvas = document.getElementById('webgl');
@@ -169,6 +188,7 @@ function waitForModels() {
         ball_buffers = buildModelBuffers(ball);
 
     if(table_buffers && pad_r_buffers && pad_b_buffers && ball_buffers) {
+        mirrorBuffers = buildMirrorBuffers();
         render();
     }
     else {
@@ -231,6 +251,16 @@ function render() {
     // Rotates flag
     flagAngle = Math.sin(Date.now() * 0.002 * flagSpeed) * 25;
 
+    let ballT = translate(-0.3, 0, ballZ);
+
+    // computer rect
+    let scaleX = canvas.width / 1600;
+    let scaleY = canvas.height / 900;
+    let mirrorSX = Math.floor(479 * scaleX);
+    let mirrorSH = Math.ceil(139 * scaleY);
+    let mirrorSW = Math.ceil(643 * scaleX);
+    let mirrorSY = Math.floor(canvas.height - 163 * scaleY);
+
     // Displays model in viewport
     gl.uniform1i(gl.getUniformLocation(program, "useTexture"), 0);
     if (table_buffers) drawModel(table, table_buffers, mat4());
@@ -241,7 +271,34 @@ function render() {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, ballTexture);
     gl.uniform1i(gl.getUniformLocation(program, "useTexture"), 1);
-    if (ball_buffers) drawModel(ball, ball_buffers, translate(-0.3, 0, ballZ));
+    //if (ball_buffers) drawModel(ball, ball_buffers, translate(-0.3, 0, ballZ));
+    if (ball_buffers) drawModel(ball, ball_buffers, ballT);
+
+    // draw mirror surface and need blend in order for us to see the ball
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    drawMirrorSurface();
+    gl.disable(gl.BLEND);
+
+    // draw reflection on the top of the mirror
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(mirrorSX, mirrorSY, mirrorSW, mirrorSH);
+    gl.clear(gl.DEPTH_BUFFER_BIT);
+    // diasable depth (reflection always on the top of themirror)
+    gl.disable(gl.DEPTH_TEST);
+
+    // have bright ambient and changr the light for reflection
+    gl.uniform4fv(gl.getUniformLocation(program, "vAmbient"), flatten(vec4(1.0, 1.0, 1.0, 1.0)));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(vec4(-1.148, 3.0, ballZ, 1.0)));
+
+    let reflectT = mult(translate(REFLECT_DX, 0, 0), ballT);
+    if (ball_buffers) drawModel(ball, ball_buffers, reflectT);
+
+    // change back lighnting
+    gl.enable(gl.DEPTH_TEST);
+    gl.uniform4fv(gl.getUniformLocation(program, "vAmbient"), flatten(vec4(0.4, 0.4, 0.4, 1.0)));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(vec4(2.0, 4.0, 2.0, 1.0)));
+    gl.disable(gl.SCISSOR_TEST);
 
     // Flagpole (parent)
     let poleMatrix = mult(
@@ -533,6 +590,39 @@ function drawSky() {
     gl.uniform1i(gl.getUniformLocation(program, "isSkybox"), 0);
 
     gl.disableVertexAttribArray(vTexCoordSky);
+}
+
+// build buffers for mirror
+function buildMirrorBuffers() {
+    let positions = [
+        vec4(MX, MY_BOT, MZ_MIN, 1), vec4(MX, MY_TOP, MZ_MIN, 1), vec4(MX, MY_TOP, MZ_MAX, 1), vec4(MX, MY_BOT, MZ_MIN, 1), vec4(MX, MY_TOP, MZ_MAX, 1), vec4(MX, MY_BOT, MZ_MAX, 1),
+    ];
+    let normals = Array(6).fill(null).map(() => vec3(1, 0, 0));
+    let tempPosBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, tempPosBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(positions), gl.STATIC_DRAW);
+
+    let tempNormBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, tempNormBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(normals), gl.STATIC_DRAW);
+
+    return {tempPosBuffer, tempNormBuffer};
+}
+
+// draw mirror surface and use light blue with a high specular
+function drawMirrorSurface() {
+    gl.bindBuffer(gl.ARRAY_BUFFER, mirrorBuffers.positionBuffer);
+    gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vPosition);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, mirrorBuffers.normalBuffer);
+    gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vNormal);
+
+    gl.uniform4fv(gl.getUniformLocation(program, "vDiffuse"), new Float32Array([0.7, 0.88, 1.0, 0.5]));
+    gl.uniform4fv(gl.getUniformLocation(program, "vSpecular"), new Float32Array([1.0, 1.0, 1.0, 1.0]));
+    gl.uniformMatrix4fv(gl.getUniformLocation(program, "modelMatrix"), false, flatten(mat4()));
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
 /**
