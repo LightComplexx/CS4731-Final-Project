@@ -1,4 +1,4 @@
-"use strict"; // Disallow unsafe behavior like using uninitialized variables
+"use strict";
 
 // WebGL globals
 let canvas;
@@ -52,6 +52,11 @@ let camY = 4.0;
 let camZ = 0.0;
 let camSpeed = 0.2;
 
+// For refractions
+let glassBuffers;
+let refractionProgram;
+let cubeMap;
+
 // Skybox variables
 let vTexCoordSky;
 let skyTexture;
@@ -93,6 +98,7 @@ function main() {
     // Initialize shaders
     program = initShaders(gl, "vshader", "fshader");
     gl.useProgram(program);
+    refractionProgram = initShaders(gl, "vshader_refraction", "fshader_refraction");
 
     createSkyBackground();
     let image = new Image();
@@ -120,6 +126,9 @@ function main() {
     // Create project matrix
     let projMatrix = perspective(40, 1, 0.1, 200);
     gl.uniformMatrix4fv(gl.getUniformLocation(program, 'projMatrix'), false, flatten(projMatrix));
+
+    // For refractions
+    configureCubeMap();
 
     // eye coordinate
     let lightPosition = vec4(2.0, 4.0, 2.0, 1.0);
@@ -162,6 +171,10 @@ function main() {
 
     flagPoleBuffers = buildSimpleBuffers(flagPoleGeo);
     flagBuffers = buildSimpleBuffers(flagGeo);
+
+    // Glass cylinder (for refraction)
+    let glassGeo = buildCylinder(0.3, 3.0, 32);
+    glassBuffers = buildSimpleBuffers(glassGeo);
 
     window.addEventListener("keydown", handleCameraKeys);
 
@@ -306,6 +319,11 @@ function render() {
     gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(vec4(2.0, 4.0, 2.0, 1.0)));
     gl.disable(gl.SCISSOR_TEST);
 
+    if (glassBuffers) {
+        let glassMatrix = translate(2.0, 0.0, 0.0);
+        drawRefractiveCylinder(glassMatrix);
+    }
+
     // Flagpole (parent)
     let poleMatrix = mult(
         translate(-2.0, 0.5, 0.0),
@@ -355,6 +373,24 @@ function handleCameraKeys(e) {
     // Clamp bounds
     camZ = Math.max(-10.0, Math.min(10.0, camZ));
     camY = Math.max(1.0, Math.min(8.0, camY));
+}
+
+function configureCubeMap() {
+    cubeMap = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMap);
+
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255,0,0,255]));
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_X, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255,255,0,255]));
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Y, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0,255,0,255]));
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0,255,255,255]));
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Z, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0,0,255,255]));
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255,0,255,255]));
 }
 
 // Gradient texture used for ball
@@ -451,6 +487,35 @@ function createSkyBackground() {
     skyTexCoordBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, skyTexCoordBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(skyTexCoords), gl.STATIC_DRAW);
+}
+
+function drawRefractiveCylinder(matrix) {
+    gl.useProgram(refractionProgram);
+
+    // Set uniforms
+    gl.uniformMatrix4fv(gl.getUniformLocation(refractionProgram, "modelMatrix"), false, flatten(matrix));
+    gl.uniformMatrix4fv(gl.getUniformLocation(refractionProgram, "viewMatrix"), false, flatten(lookAt(vec3(camX, camY, camZ), vec3(0,0,0), vec3(0,1,0))));
+    gl.uniformMatrix4fv(gl.getUniformLocation(refractionProgram, "projMatrix"), false, flatten(perspective(40, 1, 0.1, 200)));
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMap);
+    gl.uniform1i(gl.getUniformLocation(refractionProgram, "texMap"), 0);
+
+    // Bind buffers
+    gl.bindBuffer(gl.ARRAY_BUFFER, glassBuffers.pos);
+    let vPos = gl.getAttribLocation(refractionProgram, "vPosition");
+    gl.vertexAttribPointer(vPos, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vPos);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, glassBuffers.norm);
+    let vNorm = gl.getAttribLocation(refractionProgram, "vNormal");
+    gl.vertexAttribPointer(vNorm, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vNorm);
+
+    gl.drawArrays(gl.TRIANGLES, 0, glassBuffers.count);
+
+    // Restore main program
+    gl.useProgram(program);
 }
 
 // Cylinder for flagpole
