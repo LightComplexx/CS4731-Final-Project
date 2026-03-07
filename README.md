@@ -8,13 +8,13 @@ Our table tennis animation project is an interactive 3D table tennis built in We
 Simply download the code and open the html file
 
 
+
 *Controls*
 
 A - Toggle Animation
 S - Toggle mirror visibility
 L - Enable-disable lighting
-
-Arrom Keys - Move camera vertically and horizontally
+Arrow Keys - Move camera vertically and horizontally
 
 
 
