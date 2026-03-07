@@ -320,7 +320,7 @@ function render() {
     gl.disable(gl.SCISSOR_TEST);
 
     if (glassBuffers) {
-        let glassMatrix = translate(2.0, 0.0, 0.0);
+        let glassMatrix = translate(2.0, -2.0, 0.0);
         drawRefractiveCylinder(glassMatrix);
     }
 
