@@ -82,6 +82,11 @@ const MY_TOP = 2.166;
 // delta x
 const REFLECT_DX = -1.296;
 
+// Keyboard toggles
+let togAnimation = true;
+let togShadows = true;
+let togLights = true;
+
 function main() {
     // Retrieve <canvas> element
     canvas = document.getElementById('webgl');
@@ -104,7 +109,7 @@ function main() {
     let image = new Image();
     image.crossOrigin = "";
     image.src = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/July_night_sky_%2835972569256%29.jpg/960px-July_night_sky_%2835972569256%29.jpg";
-    image.onload = function() {
+    image.onload = function () {
         configureTexture(image);
     };
 
@@ -132,8 +137,8 @@ function main() {
 
     // eye coordinate
     let lightPosition = vec4(2.0, 4.0, 2.0, 1.0);
-    let lightAmbient  = vec4(0.5, 0.5, 0.5, 1.0);
-    let lightDiffuse  = vec4(1.0, 1.0, 1.0, 1.0);
+    let lightAmbient = vec4(0.5, 0.5, 0.5, 1.0);
+    let lightDiffuse = vec4(1.0, 1.0, 1.0, 1.0);
     let lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 
     gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(lightPosition));
@@ -200,22 +205,23 @@ function waitForModels() {
     if (!ball_buffers && ball.objParsed && ball.mtlParsed)
         ball_buffers = buildModelBuffers(ball);
 
-    if(table_buffers && pad_r_buffers && pad_b_buffers && ball_buffers) {
+    if (table_buffers && pad_r_buffers && pad_b_buffers && ball_buffers) {
         mirrorBuffers = buildMirrorBuffers();
         render();
-    }
-    else {
+    } else {
         // Loop back if all buffers aren't ready
         requestAnimationFrame(waitForModels);
     }
 }
 
 function render() {
-    // Check for paddle trigger
-    padTrigger();
+    if (togAnimation) {
+        // Check for paddle trigger
+        padTrigger();
 
-    // Calculate object movements
-    calcObjectMovements();
+        // Calculate object movements
+        calcObjectMovements();
+    }
 
     // Create camera view matrix
     let viewMatrix = lookAt(
@@ -226,12 +232,13 @@ function render() {
     gl.uniformMatrix4fv(gl.getUniformLocation(program, 'viewMatrix'), false, flatten(viewMatrix));
 
     // spotlight on the ball (following it)
-    let lightPosition = vec4(-0.3, 5.0, ballZ, 1.0);
-    gl.uniform4fv(gl.getUniformLocation(program,"lightPosition"), flatten(lightPosition));
-    let spotlightDirection = vec3(0.0, -1.0, 0.0);
-    gl.uniform3fv(gl.getUniformLocation(program,"spotlightDirection"), flatten(spotlightDirection));
-    gl.uniform1f(gl.getUniformLocation(program, "spotlightCutoff"), 0.85);
-
+    if(togLights){
+        let lightPosition = vec4(-0.3, 5.0, ballZ, 1.0);
+        gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(lightPosition));
+        let spotlightDirection = vec3(0.0, -1.0, 0.0);
+        gl.uniform3fv(gl.getUniformLocation(program, "spotlightDirection"), flatten(spotlightDirection));
+        gl.uniform1f(gl.getUniformLocation(program, "spotlightCutoff"), 0.85);
+    }
 
     // Clear background on each loop
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -260,10 +267,12 @@ function render() {
         )
     );
 
-    // Rotates flagpole
-    flagPoleAngle = Math.sin(Date.now() * 0.001 * flagPoleSpeed) * 10;
-    // Rotates flag
-    flagAngle = Math.sin(Date.now() * 0.002 * flagSpeed) * 25;
+    if (togAnimation){
+        // Rotates flagpole
+        flagPoleAngle = Math.sin(Date.now() * 0.001 * flagPoleSpeed) * 10;
+        // Rotates flag
+        flagAngle = Math.sin(Date.now() * 0.002 * flagSpeed) * 25;
+    }
 
     // Original ball translate
     let ballT = translate(-0.3, 0, ballZ);
@@ -288,30 +297,32 @@ function render() {
     gl.uniform1i(gl.getUniformLocation(program, "useTexture"), 1);
     if (ball_buffers) drawModel(ball, ball_buffers, ballT);
 
-    // draw reflection on the top of the mirror
-    gl.enable(gl.SCISSOR_TEST);
-    gl.scissor(mirrorSX, mirrorSY, mirrorSW, mirrorSH);
-    gl.clear(gl.DEPTH_BUFFER_BIT);
-    // disable depth (reflection always on the top of the mirror)
-    gl.disable(gl.DEPTH_TEST);
+    if (togShadows){
+        // draw reflection on the top of the mirror
+        gl.enable(gl.SCISSOR_TEST);
+        gl.scissor(mirrorSX, mirrorSY, mirrorSW, mirrorSH);
+        gl.clear(gl.DEPTH_BUFFER_BIT);
+        // disable depth (reflection always on the top of the mirror)
+        gl.disable(gl.DEPTH_TEST);
 
-    // Draw mirror surface
-    gl.uniform1i(gl.getUniformLocation(program, "useTexture"), 0);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        // Draw mirror surface
+        gl.uniform1i(gl.getUniformLocation(program, "useTexture"), 0);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-    gl.disable(gl.DEPTH_TEST);
-    drawMirrorSurface();
-    gl.enable(gl.DEPTH_TEST);
+        gl.disable(gl.DEPTH_TEST);
+        drawMirrorSurface();
+        gl.enable(gl.DEPTH_TEST);
 
-    gl.disable(gl.BLEND);
+        gl.disable(gl.BLEND);
 
-    // have bright ambient and change the light for reflection
-    gl.uniform4fv(gl.getUniformLocation(program, "vAmbient"), flatten(vec4(1.0, 1.0, 1.0, 1.0)));
-    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(vec4(-1.148, 3.0, ballZ, 1.0)));
+        // have bright ambient and change the light for reflection
+        gl.uniform4fv(gl.getUniformLocation(program, "vAmbient"), flatten(vec4(1.0, 1.0, 1.0, 1.0)));
+        gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(vec4(-1.148, 3.0, ballZ, 1.0)));
 
-    let reflectT = mult(translate(REFLECT_DX, 0, 0), ballT);
-    if (ball_buffers) drawModel(ball, ball_buffers, reflectT);
+        let reflectT = mult(translate(REFLECT_DX, 0, 0), ballT);
+        if (ball_buffers) drawModel(ball, ball_buffers, reflectT);
+    }
 
     // change back lighting
     gl.enable(gl.DEPTH_TEST);
@@ -368,6 +379,22 @@ function handleCameraKeys(e) {
         case "ArrowRight":
             camZ -= camSpeed;
             break;
+
+        case "A":
+        case "a":    // Toggles animation
+            console.log("A key pressed");
+            togAnimation = !togAnimation;
+            break;
+
+        case "S":
+        case "s":    // Toggles shadows
+            togShadows = !togShadows;
+            break;
+
+        case "L":
+        case "l":    // Toggles point light (diffuse & specular)
+            togLights = !togLights;
+            break;
     }
 
     // Clamp bounds
@@ -385,12 +412,12 @@ function configureCubeMap() {
     gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-    gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255,0,0,255]));
-    gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_X, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255,255,0,255]));
-    gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Y, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0,255,0,255]));
-    gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0,255,255,255]));
-    gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Z, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0,0,255,255]));
-    gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255,0,255,255]));
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 0, 0, 255]));
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_X, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 0, 255]));
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Y, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 255, 0, 255]));
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 255, 255, 255]));
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Z, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 0, 255, 255]));
 }
 
 // Gradient texture used for ball
@@ -401,10 +428,10 @@ function createBallGradientTexture() {
     for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
 
-            let dx = (x - size/2) / (size/2);
-            let dy = (y - size/2) / (size/2);
+            let dx = (x - size / 2) / (size / 2);
+            let dy = (y - size / 2) / (size / 2);
 
-            let dist = Math.sqrt(dx*dx + dy*dy);
+            let dist = Math.sqrt(dx * dx + dy * dy);
 
             // Clamp distance
             dist = Math.min(dist, 1.0);
@@ -417,9 +444,9 @@ function createBallGradientTexture() {
             let index = (y * size + x) * 4;
 
             data[index] = color;      // R
-            data[index+1] = color;    // G
-            data[index+2] = color;    // B
-            data[index+3] = 255;      // A
+            data[index + 1] = color;    // G
+            data[index + 2] = color;    // B
+            data[index + 3] = 255;      // A
         }
     }
 
@@ -463,21 +490,21 @@ function configureTexture(image) {
 function createSkyBackground() {
 
     let skyVertices = [
-        vec4(-25.0,  10.0, -15.0, 1.0),
-        vec4(-25.0,  10.0,  15.0, 1.0),
-        vec4(-25.0, -10.0,  15.0, 1.0),
-        vec4(-25.0,  10.0, -15.0, 1.0),
-        vec4(-25.0, -10.0,  15.0, 1.0),
+        vec4(-25.0, 10.0, -15.0, 1.0),
+        vec4(-25.0, 10.0, 15.0, 1.0),
+        vec4(-25.0, -10.0, 15.0, 1.0),
+        vec4(-25.0, 10.0, -15.0, 1.0),
+        vec4(-25.0, -10.0, 15.0, 1.0),
         vec4(-25.0, -10.0, -15.0, 1.0)
     ];
 
     let skyTexCoords = [
-        vec2(0.0,1.0),
-        vec2(1.0,1.0),
-        vec2(1.0,0.0),
-        vec2(0.0,1.0),
-        vec2(1.0,0.0),
-        vec2(0.0,0.0)
+        vec2(0.0, 1.0),
+        vec2(1.0, 1.0),
+        vec2(1.0, 0.0),
+        vec2(0.0, 1.0),
+        vec2(1.0, 0.0),
+        vec2(0.0, 0.0)
     ];
 
     skyPositionBuffer = gl.createBuffer();
@@ -494,7 +521,7 @@ function drawRefractiveCylinder(matrix) {
 
     // Set uniforms
     gl.uniformMatrix4fv(gl.getUniformLocation(refractionProgram, "modelMatrix"), false, flatten(matrix));
-    gl.uniformMatrix4fv(gl.getUniformLocation(refractionProgram, "viewMatrix"), false, flatten(lookAt(vec3(camX, camY, camZ), vec3(0,0,0), vec3(0,1,0))));
+    gl.uniformMatrix4fv(gl.getUniformLocation(refractionProgram, "viewMatrix"), false, flatten(lookAt(vec3(camX, camY, camZ), vec3(0, 0, 0), vec3(0, 1, 0))));
     gl.uniformMatrix4fv(gl.getUniformLocation(refractionProgram, "projMatrix"), false, flatten(perspective(40, 1, 0.1, 200)));
 
     gl.activeTexture(gl.TEXTURE0);
@@ -551,7 +578,7 @@ function buildCylinder(radius, height, segments) {
         normals.push(n1, n2, n2);
     }
 
-    return { positions, normals };
+    return {positions, normals};
 }
 
 // Flag for flagpole
@@ -563,28 +590,28 @@ function buildFlag(width, height, thickness) {
     // Rectangular prism for flag
     let verts = [
         // Front
-        [-w, -h,  t], [ w, -h,  t], [ w,  h,  t],
-        [-w, -h,  t], [ w,  h,  t], [-w,  h,  t],
+        [-w, -h, t], [w, -h, t], [w, h, t],
+        [-w, -h, t], [w, h, t], [-w, h, t],
 
         // Back
-        [-w, -h, -t], [ w, -h, -t], [ w,  h, -t],
-        [-w, -h, -t], [ w,  h, -t], [-w,  h, -t],
+        [-w, -h, -t], [w, -h, -t], [w, h, -t],
+        [-w, -h, -t], [w, h, -t], [-w, h, -t],
 
         // Left
-        [-w, -h, -t], [-w, -h,  t], [-w,  h,  t],
-        [-w, -h, -t], [-w,  h,  t], [-w,  h, -t],
+        [-w, -h, -t], [-w, -h, t], [-w, h, t],
+        [-w, -h, -t], [-w, h, t], [-w, h, -t],
 
         // Right
-        [ w, -h, -t], [ w, -h,  t], [ w,  h,  t],
-        [ w, -h, -t], [ w,  h,  t], [ w,  h, -t],
+        [w, -h, -t], [w, -h, t], [w, h, t],
+        [w, -h, -t], [w, h, t], [w, h, -t],
 
         // Top
-        [-w,  h, -t], [ w,  h, -t], [ w,  h,  t],
-        [-w,  h, -t], [ w,  h,  t], [-w,  h,  t],
+        [-w, h, -t], [w, h, -t], [w, h, t],
+        [-w, h, -t], [w, h, t], [-w, h, t],
 
         // Bottom
-        [-w, -h, -t], [ w, -h, -t], [ w, -h,  t],
-        [-w, -h, -t], [ w, -h,  t], [-w, -h,  t],
+        [-w, -h, -t], [w, -h, -t], [w, -h, t],
+        [-w, -h, -t], [w, -h, t], [-w, -h, t],
     ];
 
     let positions = [];
@@ -592,8 +619,8 @@ function buildFlag(width, height, thickness) {
 
     for (let i = 0; i < verts.length; i += 3) {
         let a = vec4(...verts[i], 1);
-        let b = vec4(...verts[i+1], 1);
-        let c = vec4(...verts[i+2], 1);
+        let b = vec4(...verts[i + 1], 1);
+        let c = vec4(...verts[i + 2], 1);
 
         positions.push(a, b, c);
 
@@ -602,7 +629,7 @@ function buildFlag(width, height, thickness) {
         normals.push(vec4(n, 0), vec4(n, 0), vec4(n, 0));
     }
 
-    return { positions, normals };
+    return {positions, normals};
 }
 
 // For building the simple shapes
@@ -635,8 +662,8 @@ function drawSimple(buffers, matrix) {
     gl.vertexAttribPointer(vNormal, 4, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vNormal);
 
-    gl.uniform4fv(gl.getUniformLocation(program, "vDiffuse"), flatten(vec4(0.8,0.8,0.8,1)));
-    gl.uniform4fv(gl.getUniformLocation(program, "vSpecular"), flatten(vec4(1,1,1,1)));
+    gl.uniform4fv(gl.getUniformLocation(program, "vDiffuse"), flatten(vec4(0.8, 0.8, 0.8, 1)));
+    gl.uniform4fv(gl.getUniformLocation(program, "vSpecular"), flatten(vec4(1, 1, 1, 1)));
 
     gl.drawArrays(gl.TRIANGLES, 0, buffers.count);
 }
@@ -841,13 +868,13 @@ function drawModel(model, bufferGroups, matrix) {
  * Triggers paddle movement based on the
  * position of the ball.
  */
-function padTrigger(){
+function padTrigger() {
     // Check ball bounds for red paddle movement to
     // trigger animation.
     // Reset pad direction when animation finishes
-    if (ballZ < -1.5 && !move_rPad){
+    if (ballZ < -1.5 && !move_rPad) {
         move_rPad = true;
-    } else if (ballZ > -1.5){
+    } else if (ballZ > -1.5) {
         rPadSpeed *= -1.0;
     }
 
@@ -856,7 +883,7 @@ function padTrigger(){
     // Reset pad direction when animation finishes
     if (ballZ > 1.0 && !move_bPad) {
         move_bPad = true;
-    } else if(ballZ < 1.0) {
+    } else if (ballZ < 1.0) {
         bPadSpeed *= -1.0;
     }
 }
@@ -865,37 +892,37 @@ function padTrigger(){
  * Calculates movement for all objects
  * that move within the scene.
  */
-function calcObjectMovements(){
+function calcObjectMovements() {
     // Change ball direction at bounds:
     // Blue paddle (left) || red paddle (right)
-    if(ballZ > 1.5 && ballSpeed > 0.0 || ballZ < -2.0 && ballSpeed < 0.0){
+    if (ballZ > 1.5 && ballSpeed > 0.0 || ballZ < -2.0 && ballSpeed < 0.0) {
         ballSpeed *= -1.0;
     }
 
     // Move red paddle if triggered
-    if(move_rPad){
+    if (move_rPad) {
         rPadZ -= rPadSpeed;
-        if(rPadZ < 1.82 && rPadSpeed > 0.0){
+        if (rPadZ < 1.82 && rPadSpeed > 0.0) {
             rPadSpeed *= -1.0;
         }
-        if(rPadZ >= 2.0 && rPadSpeed < 0.0){
+        if (rPadZ >= 2.0 && rPadSpeed < 0.0) {
             move_rPad = false;
             rPadZ = 2.0;
         }
     }
 
     // Move blue paddle if triggered
-    if(move_bPad){
+    if (move_bPad) {
         bPadZ += bPadSpeed;
-        if(bPadZ > 2.17 && bPadSpeed > 0.0){
+        if (bPadZ > 2.17 && bPadSpeed > 0.0) {
             bPadSpeed *= -1.0;
         }
-        if(bPadZ <= 2.0 && bPadSpeed < 0.0){
+        if (bPadZ <= 2.0 && bPadSpeed < 0.0) {
             move_bPad = false;
             bPadZ = 2.0;
         }
     }
 
     // Move ball
-    ballZ+= ballSpeed;
+    ballZ += ballSpeed;
 }
