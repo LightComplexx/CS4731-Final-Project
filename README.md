@@ -19,6 +19,7 @@ Arrom Keys - Move camera vertically and horizontally
 
 
 Member Responsibilities:
+
 Anh Dinh:
 - 
 
